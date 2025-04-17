@@ -33,31 +33,31 @@
     const url = 'https://live-golf-data.p.rapidapi.com/leaderboard?orgId=1&tournId=012&year=2025';
 
     fetch(url, {
-      method: 'GET',
-      headers: {
-        'x-rapidapi-host': 'live-golf-data.p.rapidapi.com',
-        'x-rapidapi-key': '53e012eec0msh9138d9196b9f91dp18d8e8jsn805f3b230ace'
-      }
-    })
-    .then(response => response.json())
-    .then(data => {
-      const players = data.leaderboard || []; // Assuming 'leaderboard' holds player data
-      const tableBody = document.querySelector('#leaderboard-table tbody');
+  method: 'GET',
+  headers: {
+    'x-rapidapi-host': 'live-golf-data.p.rapidapi.com',
+    'x-rapidapi-key': '53e012eec0msh9138d9196b9f91dp18d8e8jsn805f3b230ace'
+  }
+})
+.then(response => response.json())
+.then(data => {
+  console.log('API Response:', data); // Log the entire response to see the structure
 
-      players.forEach(player => {
-        const row = `
-          <tr>
-            <td>${player.lastName}</td>
-            <td>${player.position}</td>
-            <td>${player.total}</td>
-            <td>${player.status}</td>
-            <td>${player.totalStrokesFromCompletedRounds}</td>
-          </tr>
-        `;
-        tableBody.innerHTML += row;
-      });
-    })
-    .catch(error => console.error('Error fetching leaderboard:', error));
+  const players = data.leaderboard || []; // Assuming 'leaderboard' holds player data
+  const tableBody = document.querySelector('#leaderboard-table tbody');
+
+  players.forEach(player => {
+    const row = `
+      <tr>
+        <td>${player.lastName}</td>
+        <td>${player.position}</td>
+        <td>${player.total}</td>
+      </tr>
+    `;
+    tableBody.innerHTML += row;
+  });
+})
+.catch(error => console.error('Error fetching leaderboard:', error));
   </script>
 </body>
 </html>
