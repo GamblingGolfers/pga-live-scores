@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>PGA Live Scores</title>
+  <style>
+    table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+  <h1>PGA Tour Live Scores</h1>
+  <table id="scores-table">
+    <thead>
+      <tr>
+        <th>Player</th>
+        <th>Score</th>
+        <th>Thru</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    const apiKey = 'YOUR_API_KEY_HERE';
+    const apiUrl = `https://feeds.datagolf.com/get-leaderboard?tour=pga&key=${apiKey}`;
+
+    fetch(apiUrl)
+      .then(response => response.json())
+      .then(data => {
+        const players = data.players.slice(0, 10); // Limit to top 10 for simplicity
+        const tableBody = document.querySelector('#scores-table tbody');
+        tableBody.innerHTML = ''; // Clear old data
+
+        players.forEach(player => {
+          const row = `
+            <tr>
+              <td>${player.player_name}</td>
+              <td>${player.total}</td>
+              <td>${player.thru}</td>
+            </tr>
+          `;
+          tableBody.innerHTML += row;
+        });
+      })
+      .catch(error => {
+        console.error('Error fetching leaderboard:', error);
+      });
+  </script>
+</body>
+</html>
