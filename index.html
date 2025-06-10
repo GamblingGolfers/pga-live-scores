@@ -4,126 +4,94 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="connect-src 'self' https://live-golf-data.p.rapidapi.com;">
-    <title>Golf Tracker</title>
+    <title>PGA Live Leaderboard</title>
+    
+    <!-- Import the "Inter" font family from Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
     <style>
+        /* --- CSS Color and Style Variables --- */
+        :root {
+            --bg-color: #121212;
+            --card-color: rgba(38, 38, 38, 0.7);
+            --text-color: #e0e0e0;
+            --text-muted-color: #a0a0a0;
+            --border-color: rgba(255, 255, 255, 0.1);
+            --accent-color: #00aaff;
+            --score-green: #28a745;
+            --score-red: #dc3545;
+            --hover-color: rgba(255, 255, 255, 0.05);
+        }
+
         /* --- General Page Styles --- */
+        * { box-sizing: border-box; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #f4f7f6;
-            color: #333;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
             margin: 0;
             padding: 20px;
         }
-        .container {
-            max-width: 900px;
-            margin: auto;
-            background-color: #fff;
-            padding: 20px 30px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-        }
-        h1, h2 {
-            color: #1a3a3a;
-            border-bottom: 2px solid #e0e0e0;
-            padding-bottom: 10px;
-            margin-top: 0;
-        }
-        h2 { margin-top: 30px; }
+        .container { max-width: 950px; margin: auto; animation: fadeIn 0.5s ease-out; }
+        h1, h2 { color: #fff; padding-bottom: 10px; margin-top: 0; font-weight: 700; }
+        h2 { margin-top: 40px; border-bottom: 1px solid var(--border-color); font-weight: 600; }
+        h1 { font-size: 2.5em; text-align: center; margin-bottom: 40px; }
 
-        /* --- UPDATED: Gambler Card Layout --- */
-        #gamblers-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-        }
-        .gambler-card {
-            background-color: #fdfdfd;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-            border: 1px solid #eee;
-            text-align: center;
-        }
-        .gambler-card .name {
-            font-weight: 600;
-            font-size: 1.2em;
-            color: #333;
-        }
-        .gambler-card .total-score {
-            font-weight: bold;
-            font-size: 2.8em;
-            margin-top: 5px;
-        }
-        /* NEW: Styles for Today's Score and Team Status */
-        .gambler-card .today-score {
-            font-size: 1.1em;
-            font-weight: 600;
-            margin-top: 5px;
-        }
-        .gambler-card .team-status {
-            font-size: 0.8em;
-            font-weight: 500;
-            color: #888;
-            text-transform: uppercase;
-            margin-top: 5px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #eee;
-        }
-        .gambler-card .player-breakdown {
-            font-size: 0.9em;
-            text-align: left;
-            margin-top: 10px;
-        }
-        .player-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 4px 0;
-        }
-        .player-row .player-name {
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            padding-right: 10px;
-        }
-        .player-row .player-score {
-            font-weight: 600;
-        }
-        .player-row.missed-cut {
-            text-decoration: line-through;
-            color: #999;
-        }
+        /* --- Glassmorphism Card Layout --- */
+        #gamblers-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px; }
+        .gambler-card { background: var(--card-color); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); text-align: center; transition: all 0.3s ease; }
+        .gambler-card:hover { transform: translateY(-5px); box-shadow: 0 8px 25px rgba(0,0,0,0.2); }
+        .gambler-card .name { font-weight: 600; font-size: 1.2em; color: var(--text-color); }
+        .gambler-card .total-score { font-weight: 700; font-size: 3em; margin: 8px 0 5px 0; }
+        .gambler-card .today-score { font-size: 1.1em; font-weight: 600; }
+        .gambler-card .team-status { font-size: 0.8em; font-weight: 500; color: var(--text-muted-color); text-transform: uppercase; margin-top: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color); }
+        .gambler-card .player-breakdown { font-size: 0.9em; text-align: left; margin-top: 12px; color: var(--text-muted-color); }
+        .player-row { display: flex; justify-content: space-between; padding: 5px 0; }
+        .player-row .player-score { font-weight: 600; }
+        .player-row.missed-cut { text-decoration: line-through; opacity: 0.6; }
 
-        /* --- Score Colors --- */
-        .score-under { color: #1a8754; }
-        .score-over { color: #d9534f; }
-        .score-even { color: #333; }
+        /* --- Score & Tag Colors --- */
+        .score-under { color: var(--score-green); }
+        .score-over { color: var(--score-red); }
+        .score-even { color: var(--text-color); }
+        .tag { display: inline-block; background-color: var(--accent-color); color: #fff; padding: 4px 10px; border-radius: 12px; font-size: 0.8em; font-weight: 500; margin-right: 5px; margin-bottom: 3px; }
         
-        /* --- Leaderboard Table Styles (Unchanged) --- */
-        #leaderboard-table { width: 100%; border-collapse: collapse; }
-        #leaderboard-table th, #leaderboard-table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #e6e6e6; }
-        #leaderboard-table thead th { background-color: #f2f2f2; font-weight: 600; color: #555; }
-        #leaderboard-table tbody tr:nth-child(even) { background-color: #f9f9f9; }
-        #leaderboard-table tbody tr:hover { background-color: #eef8ff; }
-        #leaderboard-table td:nth-child(2), #leaderboard-table td:nth-child(4), #leaderboard-table td:nth-child(5), #leaderboard-table td:nth-child(6) { text-align: center; font-weight: 500; }
-        .tag { display: inline-block; background-color: #e7e7e7; color: #555; padding: 3px 8px; border-radius: 12px; font-size: 0.8em; font-weight: 600; margin-right: 5px; margin-bottom: 3px; }
+        /* --- Enhanced Leaderboard Table with Sticky Header --- */
+        #leaderboard-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+        #leaderboard-table thead th { position: sticky; top: 0; background-color: #2a2a2a; font-weight: 600; color: var(--text-muted-color); z-index: 10; }
+        #leaderboard-table th, #leaderboard-table td { padding: 14px 15px; text-align: left; border-bottom: 1px solid var(--border-color); }
+        #leaderboard-table tbody tr { transition: background-color 0.2s ease; }
+        #leaderboard-table tbody tr:hover { background-color: var(--hover-color); }
+        #leaderboard-table td:nth-child(2), #leaderboard-table td:nth-child(4), #leaderboard-table td:nth-child(5), #leaderboard-table td:nth-child(6), #leaderboard-table td:nth-child(7) { text-align: center; font-weight: 500; }
     </style>
 </head>
 <body>
+
     <div class="container">
-        <h1>Discriminatory Gamblers - US Open 2025</h1>
-        <h2>Gamblers' Scores</h2>
+        <h1>PGA Live Dashboard</h1>
+        <h2>Gamblers' Totals</h2>
         <div id="gamblers-container"></div>
-        <h2>US Open 2025 Leaderboard</h2>
+        <h2>Full Leaderboard</h2>
         <table id="leaderboard-table">
             <thead>
                 <tr>
-                    <th style="width: 20%;">Tagged To</th><th style="width: 10%;">Pos</th><th>Player</th><th style="width: 10%;">Total</th><th style="width: 10%;">Thru</th><th style="width: 10%;">Round</th>
+                    <th style="width: 20%;">Tagged To</th>
+                    <th style="width: 10%;">Pos</th>
+                    <th>Player</th>
+                    <th style="width: 10%;">Total</th>
+                    <!-- NEW: Header for today's score -->
+                    <th style="width: 10%;">Today</th>
+                    <th style="width: 10%;">Thru</th>
+                    <th style="width: 10%;">Round</th>
                 </tr>
             </thead>
             <tbody id="leaderboard-body"></tbody>
         </table>
     </div>
-    <div id="debug-output" style="display: none;"></div>
+
     <script src="app.js"></script>
 </body>
 </html>
