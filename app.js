@@ -26,20 +26,20 @@ document.addEventListener('DOMContentLoaded', () => {
             return response.json();
         })
         .then(data => {
-            // --- This is the "Success" block, now corrected ---
+            // --- This is the "Success" block, corrected for the real data structure ---
 
             // Display the raw successful data in the debug area
             debugOutput.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
             leaderboardBody.innerHTML = ''; // Clear the table
 
-            // 1.  CORRECTED: Check for 'leaderboardRows' instead of 'leaderboard.players'
+            // This condition now perfectly matches the data you received
             if (data && data.leaderboardRows && data.leaderboardRows.length > 0) {
                 
-                // 2.  CORRECTED: Loop through the 'leaderboardRows' array
+                // Loop through the 'leaderboardRows' array
                 data.leaderboardRows.forEach(player => {
                     const row = document.createElement('tr');
 
-                    // 3.  CORRECTED: Use the new property names from the JSON data
+                    // Use the property names from the JSON data
                     const position = player.position;
                     const playerName = `${player.firstName} ${player.lastName}`;
                     const totalToPar = player.total;
@@ -64,11 +64,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     leaderboardBody.appendChild(row);
                 });
             } else {
+                // If there are no players, display a message in the table
                 leaderboardBody.innerHTML = '<tr><td colspan="5">Leaderboard data received, but it contains no players.</td></tr>';
             }
         })
         .catch(error => {
-            // This is the "Failure" block, it will remain for future debugging
+            // This is the "Failure" block
             debugOutput.innerHTML = `
                 <h3>An Error Occurred!</h3>
                 <p><strong>${error.toString()}</strong></p>
