@@ -10,24 +10,17 @@
         table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
         th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #ddd; }
         th { background-color: #f2f2f2; }
-        #debug-output {
-            background-color: #333;
-            color: #fff;
-            padding: 15px;
-            border-radius: 5px;
-            white-space: pre-wrap; /* Allows text to wrap */
-            word-wrap: break-word; /* Breaks long words */
-        }
+        .placeholder-row td { text-align: center; color: #777; font-style: italic; }
+        #debug-output { display: none; } /* Hide the debug output by default now */
     </style>
 </head>
 <body>
 
     <h1>PGA Tour Leaderboard</h1>
-
     <table id="leaderboard-table">
         <thead>
             <tr>
-                <th>Position</th>
+                <th>Favourite</th> <th>Position</th>
                 <th>Player</th>
                 <th>Total</th>
                 <th>Thru</th>
@@ -39,11 +32,28 @@
     </table>
 
     <hr>
+
+    <h2>Favourites</h2>
+    <table id="favourites-table">
+        <thead>
+            <tr>
+                <th>Favourite</th> <th>Position</th>
+                <th>Player</th>
+                <th>Total</th>
+                <th>Thru</th>
+                <th>Round</th>
+            </tr>
+        </thead>
+        <tbody id="favourites-body">
+            <tr class="placeholder-row" id="favourites-placeholder">
+                <td colspan="6">No favourites selected yet. Check a box above to add a player.</td>
+            </tr>
+        </tbody>
+    </table>
+
     <h3>Debug Output:</h3>
-    <p>If the request fails, the error message will appear here.</p>
     <div id="debug-output"></div>
 
     <script src="app.js"></script>
-
 </body>
 </html>
