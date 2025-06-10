@@ -38,6 +38,6 @@ document.addEventListener('DOMContentLoaded', () => {
         .catch(error => {
             console.error('Error fetching data:', error);
             const leaderboardBody = document.getElementById('leaderboard-body');
-            leaderboardBody.innerHTML = `<tr><td colspan="5">Failed to load leaderboard data. See console for details.</td></tr>`;
+            leaderboardBody.innerHTML = `<tr><td colspan="5">1 Failed to load leaderboard data. See console for details.</td></tr>`;
         });
 });
