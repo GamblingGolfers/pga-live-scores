@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
         '51766': ['Cal'],          // Wyndham Clark
         '40250': ['Billy']           // Taylor Pendrith
         '28237': ['Dean']           // Rory McIlroy
-        '38991': ['Billy]
+        '38991': ['Billy']
         '59018': ['Cal']
         '35506': ['Pet']
         '54628': ['Pet']
