@@ -6,48 +6,129 @@
     <meta http-equiv="Content-Security-Policy" content="connect-src 'self' https://live-golf-data.p.rapidapi.com;">
     <title>PGA Live Leaderboard</title>
     <style>
-        body { font-family: sans-serif; line-height: 1.6; padding: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-        th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #ddd; }
-        th { background-color: #f2f2f2; }
-        #debug-output { display: none; }
-        #gamblers-table th, #gamblers-table td { font-size: 1.2em; font-weight: bold; }
+        /* --- General Page Styles --- */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: auto;
+            background-color: #fff;
+            padding: 20px 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+        h1, h2 {
+            color: #1a3a3a;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+        h2 { margin-top: 30px; }
+
+        /* --- NEW: Gambler Card Layout --- */
+        #gamblers-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            text-align: center;
+        }
+        .gambler-card {
+            background-color: #fdfdfd;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            border: 1px solid #eee;
+        }
+        .gambler-card .name {
+            font-weight: 600;
+            font-size: 1.1em;
+            color: #555;
+            margin-bottom: 8px;
+        }
+        .gambler-card .score {
+            font-weight: bold;
+            font-size: 2.2em;
+        }
+
+        /* --- Score Colors --- */
+        .score-under { color: #1a8754; } /* Green */
+        .score-over { color: #d9534f; }  /* Red */
+        .score-even { color: #333; }     /* Black */
+        
+        /* --- Enhanced Leaderboard Table Styles --- */
+        #leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        #leaderboard-table th, #leaderboard-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #e6e6e6;
+        }
+        #leaderboard-table thead th {
+            background-color: #f2f2f2;
+            font-weight: 600;
+            color: #555;
+        }
+        #leaderboard-table tbody tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        #leaderboard-table tbody tr:hover {
+            background-color: #eef8ff;
+        }
+        #leaderboard-table td:nth-child(2), /* Position */
+        #leaderboard-table td:nth-child(4), /* Total */
+        #leaderboard-table td:nth-child(5), /* Thru */
+        #leaderboard-table td:nth-child(6) { /* Round */
+            text-align: center;
+            font-weight: 500;
+        }
+        
+        /* --- NEW: Tag Pill Styles --- */
+        .tag {
+            display: inline-block;
+            background-color: #e7e7e7;
+            color: #555;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: 600;
+            margin-right: 5px;
+            margin-bottom: 3px;
+        }
     </style>
 </head>
 <body>
 
-    <h1>PGA Tour Leaderboard</h1>
+    <div class="container">
+        <h1>PGA Tour Leaderboard</h1>
 
-    <h2>Gamblers' Totals</h2>
-    <table id="gamblers-table">
-        <thead>
-            <tr>
-                <th>Gambler</th>
-                <th>Combined Score</th>
-            </tr>
-        </thead>
-        <tbody id="gamblers-body">
-            </tbody>
-    </table>
+        <h2>Gamblers' Totals</h2>
+        <div id="gamblers-container">
+            </div>
 
-    <hr>
+        <h2>Full Leaderboard</h2>
+        <table id="leaderboard-table">
+            <thead>
+                <tr>
+                    <th style="width: 20%;">Tagged To</th>
+                    <th style="width: 10%;">Pos</th>
+                    <th>Player</th>
+                    <th style="width: 10%;">Total</th>
+                    <th style="width: 10%;">Thru</th>
+                    <th style="width: 10%;">Round</th>
+                </tr>
+            </thead>
+            <tbody id="leaderboard-body"></tbody>
+        </table>
+    </div>
 
-    <h2>Full Leaderboard</h2>
-    <table id="leaderboard-table">
-        <thead>
-            <tr>
-                <th style="width: 15%;">Tagged To</th> <th style="width: 10%;">Position</th>
-                <th>Player</th>
-                <th style="width: 10%;">Total</th>
-                <th style="width: 10%;">Thru</th>
-                <th style="width: 10%;">Round</th>
-            </tr>
-        </thead>
-        <tbody id="leaderboard-body">
-            </tbody>
-    </table>
-
-    <div id="debug-output"></div>
+    <div id="debug-output" style="display: none;"></div>
 
     <script src="app.js"></script>
 </body>
