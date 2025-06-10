@@ -1,35 +1,32 @@
-// FINAL - This version correctly calls the secure Netlify function.
+// FINAL VERSION - Includes "Today" score in main leaderboard
 
 document.addEventListener('DOMContentLoaded', () => {
 
-// --- THIS IS THE FINAL, CORRECTED LIST ---
-const gamblerPicks = {
-    '37378': ['Kris'],          // Min Woo Lee
-    '31323': ['Phil'],          // Gary Woodland
-    '58619': ['Kris'],          // Kevin Velo
-    '46046': ['Dean'],          // Scottie Scheffler
-    '52666': ['Phil'],          // Sami Valimaki
-    '51766': ['Cal'],           // Wyndham Clark
-    '40250': ['Billy'],         // Taylor Pendrith
-    '28237': ['Dean'],          // Rory McIlroy
-    '38991': ['Billy'],         // Jorge Campillo  <-- Corrected quote and comma
-    '59018': ['Cal'],           // Ludvig Aberg    <-- Corrected comma
-    '35506': ['Pet'],           // Adam Hadwin     <-- Corrected comma
-    '54628': ['Pet']            // Tom Hoge
-};
+    const gamblerPicks = {
+        '37378': ['Kris', 'Cal'],   // Min Woo Lee
+        '31323': ['Phil'],          // Gary Woodland
+        '58619': ['Kris'],          // Kevin Velo
+        '46046': ['Dean'],          // Scottie Scheffler
+        '52666': ['Phil'],          // Sami Valimaki
+        '51766': ['Cal'],           // Wyndham Clark
+        '40250': ['Billy'],         // Taylor Pendrith
+        '28237': ['Dean'],          // Rory McIlroy
+        '38991': ['Billy'],         // Jorge Campillo
+        '59018': ['Cal'],           // Ludvig Aberg
+        '35506': ['Pet'],           // Adam Hadwin
+        '54628': ['Pet']            // Tom Hoge
+    };
 
     const availableGamblers = ['Kris', 'Phil', 'Pet', 'Cal', 'Billy', 'Dean'];
     let allPlayersData = []; 
 
-    // --- THIS IS THE CORRECT URL ---
-    // It points to YOUR secure function, not the public API.
     const url = '/.netlify/functions/get-scores'; 
 
     const leaderboardBody = document.getElementById('leaderboard-body');
     const gamblersContainer = document.getElementById('gamblers-container');
 
     const parseScore = (score) => {
-        if (typeof score !== 'string' || score.toUpperCase() === 'E') return 0;
+        if (typeof score !== 'string' || score.toUpperCase() === 'E' || !score) return 0;
         const number = parseInt(score, 10);
         return isNaN(number) ? 0 : number;
     };
@@ -78,12 +75,9 @@ const gamblerPicks = {
         sortedGamblers.forEach(([gamblerName, gamblerInfo]) => {
             const card = document.createElement('div');
             card.className = 'gambler-card';
-            let finalScore;
-            if (gamblerInfo.hasMissedCutPlayer) {
-                finalScore = { text: formatScore(gamblerInfo.totalScore).text, className: 'score-over' };
-            } else {
-                finalScore = formatScore(gamblerInfo.totalScore);
-            }
+            let finalScore = gamblerInfo.hasMissedCutPlayer
+                ? { text: formatScore(gamblerInfo.totalScore).text, className: 'score-over' }
+                : formatScore(gamblerInfo.totalScore);
             const todayScoreInfo = formatScore(gamblerInfo.todayScore);
             const madeCutCount = gamblerInfo.totalPicks - gamblerInfo.missedCutCount;
             const teamStatusText = `${madeCutCount}/${gamblerInfo.totalPicks} MADE CUT`;
@@ -99,24 +93,26 @@ const gamblerPicks = {
     };
     
     const fetchLeaderboardData = () => {
-        // The fetch call correctly points to our secure function with NO key or headers.
         fetch(url)
             .then(response => {
                 if (!response.ok) { throw new Error(`Request Failed: ${response.statusText} (${response.status})`); }
                 return response.json();
             })
             .then(data => {
-                // The try...catch block is removed as the previous error was my fault. 
-                // We can add it back if new rendering errors appear.
                 allPlayersData = data.leaderboardRows || [];
                 let cutScoreValue = 'N/A';
                 if (data.cutLines && data.cutLines.length > 0 && data.cutLines[0].cutScore) {
                     cutScoreValue = data.cutLines[0].cutScore;
                 }
+                
                 leaderboardBody.innerHTML = allPlayersData.map(player => {
                     if (!player || !player.playerId) return ''; 
                     const tagsHtml = (gamblerPicks[player.playerId] || []).map(tag => `<span class="tag">${tag}</span>`).join('');
-                    const scoreInfo = formatScore(parseScore(player.total));
+                    const totalScoreInfo = formatScore(parseScore(player.total));
+                    
+                    // --- NEW: Get and format the current round score ---
+                    const todayScoreInfo = formatScore(parseScore(player.currentRoundScore));
+                    
                     let lastRound = 'N/A';
                     if (player.rounds && player.rounds.length > 0) {
                         const lastRoundData = player.rounds[player.rounds.length - 1];
@@ -124,14 +120,26 @@ const gamblerPicks = {
                             lastRound = lastRoundData.strokes['$numberInt'];
                         }
                     }
-                    return `<tr><td>${tagsHtml}</td><td>${player.position || 'N/A'}</td><td>${player.firstName || ''} ${player.lastName || ''}</td><td class="${scoreInfo.className}">${scoreInfo.text}</td><td>${player.thru || 'N/A'}</td><td>${lastRound}</td></tr>`;
+                    // --- UPDATED: Add the new cell to the table row ---
+                    return `
+                        <tr>
+                            <td>${tagsHtml}</td>
+                            <td>${player.position || 'N/A'}</td>
+                            <td>${player.firstName || ''} ${player.lastName || ''}</td>
+                            <td class="${totalScoreInfo.className}">${totalScoreInfo.text}</td>
+                            <td class="${todayScoreInfo.className}">${todayScoreInfo.text}</td>
+                            <td>${player.thru || 'N/A'}</td>
+                            <td>${lastRound}</td>
+                        </tr>
+                    `;
                 }).join('');
+
                 updateGamblersTable(cutScoreValue); 
             })
             .catch(error => {
                 console.error("Error fetching or rendering data:", error);
                 gamblersContainer.innerHTML = `<p style="color: #d9534f; font-weight: bold;">Could not load live data.</p>`;
-                leaderboardBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #d9534f;"><strong>${error.message}</strong></td></tr>`;
+                leaderboardBody.innerHTML = `<tr><td colspan="7"><strong>Error:</strong> ${error.message}</td></tr>`;
             });
     };
 
