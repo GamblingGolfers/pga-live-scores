@@ -4,19 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="connect-src 'self' https://live-golf-data.p.rapidapi.com;">
-    <title>PGA Live Scores</title>
+    <title>PGA Live Leaderboard</title>
     <style>
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        th, td {
-            padding: 8px;
-            text-align: left;
-            border-bottom: 1px solid #ddd;
-        }
-        th {
-            background-color: #f2f2f2;
+        body { font-family: sans-serif; line-height: 1.6; padding: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #f2f2f2; }
+        #debug-output {
+            background-color: #333;
+            color: #fff;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap; /* Allows text to wrap */
+            word-wrap: break-word; /* Breaks long words */
         }
     </style>
 </head>
@@ -37,12 +37,13 @@
         <tbody id="leaderboard-body">
             </tbody>
     </table>
-    </table>
 
     <hr>
     <h3>Debug Output:</h3>
-    <pre id="debug-output"></pre>
+    <p>If the request fails, the error message will appear here.</p>
+    <div id="debug-output"></div>
 
     <script src="app.js"></script>
+
 </body>
 </html>
