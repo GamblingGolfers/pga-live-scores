@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    fetch('https://live-golf-data.p.rapidapi.com/leaderboard?orgId=1&tournId=026&year=2025', options)
+    fetch('https://live-golf-data.p.rapidapi.com/leaderboard?orgId=1&tournId=020&year=2025', options)
         .then(response => {
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -24,10 +24,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     row.innerHTML = `
                         <td>${player.position}</td>
-                        <td>${player.first_name} ${player.last_name}</td>
-                        <td>${player.total_to_par}</td>
-                        <td>${player.thru}</td>
-                        <td>${player.rounds.slice(-1)[0] ? player.rounds.slice(-1)[0].strokes : 'N/A'}</td>
+                        <td>${player.firstName} ${player.lastName}</td>
+                        <td>${player.total}</td>
+                        <td>${player.currentHole}</td>
                     `;
 
                     leaderboardBody.appendChild(row);
