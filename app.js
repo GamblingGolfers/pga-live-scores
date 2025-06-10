@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const availableGamblers = ['Kris', 'Phil', 'Pet', 'Cal', 'Billy', 'Dean'];
     let allPlayersData = []; 
 
-    const apiKey = '04531f08dcmshe6e2b529c43c201p1557b0jsn0c81274dfc7c';
+    const apiKey = 'YOUR_SECRET_API_KEY';
     const url = 'https://live-golf-data.p.rapidapi.com/leaderboard?orgId=1&tournId=020&year=2025';
     const options = {
         method: 'GET',
@@ -79,16 +79,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 const missedCutClass = p.hasMissedCut ? 'missed-cut' : '';
                 const missedCutMarker = p.hasMissedCut ? ' (MC)' : '';
                 return `
-                    <div class="player-row <span class="math-inline">\{missedCutClass\}"\>
-<span class\="player\-name"\></span>{p.name}</span>
-                        <span class="player-score <span class="math-inline">\{playerScore\.className\}"\></span>{playerScore.text}${missedCutMarker}</span>
+                    <div class="player-row ${missedCutClass}">
+                        <span class="player-name">${p.name}</span>
+                        <span class="player-score ${playerScore.className}">${playerScore.text}${missedCutMarker}</span>
                     </div>
                 `;
             }).join('');
 
             card.innerHTML = `
                 <div class="name">${gamblerName}</div>
-                <div class="total-score <span class="math-inline">\{finalScore\.className\}"\></span>{finalScore.text}</div>
+                <div class="total-score ${finalScore.className}">${finalScore.text}</div>
                 <div class="player-breakdown">${playerBreakdownHtml}</div>
             `;
             gamblersContainer.appendChild(card);
@@ -97,3 +97,35 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const fetchLeaderboardData = () => {
         fetch(url, options)
+            .then(response => response.json())
+            .then(data => {
+                allPlayersData = data.leaderboardRows || [];
+                
+                let cutScoreValue = 'N/A';
+                if (data.cutLines && data.cutLines.length > 0 && data.cutLines[0].cutScore) {
+                    cutScoreValue = data.cutLines[0].cutScore;
+                }
+
+                leaderboardBody.innerHTML = allPlayersData.map(player => {
+                    const tagsHtml = (gamblerPicks[player.playerId] || []).map(tag => `<span class="tag">${tag}</span>`).join('');
+                    const scoreInfo = formatScore(parseScore(player.total));
+                    return `
+                        <tr>
+                            <td>${tagsHtml}</td>
+                            <td>${player.position}</td>
+                            <td>${player.firstName} ${player.lastName}</td>
+                            <td class="${scoreInfo.className}">${scoreInfo.text}</td>
+                            <td>${player.thru || 'N/A'}</td>
+                            <td>${player.rounds.length > 0 ? player.rounds[player.rounds.length - 1].strokes['$numberInt'] : 'N/A'}</td>
+                        </tr>
+                    `;
+                }).join('');
+
+                updateGamblersTable(cutScoreValue); 
+            })
+            .catch(error => console.error("Failed to fetch data:", error));
+    };
+
+    fetchLeaderboardData(); 
+    setInterval(fetchLeaderboardData, 60000);
+});
