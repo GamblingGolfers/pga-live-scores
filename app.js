@@ -3,6 +3,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const gamblerPicks = {
         '37378': ['Kris', 'Cal'],   // Min Woo Lee
         '31323': ['Phil'],          // Gary Woodland
+        // Example of a missed cut player (if J. Thomas was picked)
+        // '30925': ['Kris']           // Justin Thomas
     };
 
     const availableGamblers = ['Kris', 'Phil', 'Pet', 'Cal', 'Billy', 'Dean'];
@@ -30,31 +32,66 @@ document.addEventListener('DOMContentLoaded', () => {
         return { text: score.toString(), className: 'score-under' };
     };
 
-    const updateGamblersTable = () => {
-        const gamblerScores = {};
-        availableGamblers.forEach(gambler => { gamblerScores[gambler] = 0; });
+    // --- REWRITTEN: This function now builds a much more detailed card ---
+    const updateGamblersTable = (cutScore) => {
+        // 1. Initialize a more complex structure to hold details
+        const gamblerData = {};
+        availableGamblers.forEach(gambler => {
+            gamblerData[gambler] = { totalScore: 0, players: [] };
+        });
 
+        // 2. Process every player from the API
         allPlayersData.forEach(player => {
+            const parsedPlayerScore = parseScore(player.total);
+            
+            // Determine if the player missed the cut
+            const hasMissedCut = player.status === 'cut' || (cutScore !== 'N/A' && parsedPlayerScore > parseScore(cutScore));
+
+            // Find which gamblers picked this player
             const tagsForPlayer = gamblerPicks[player.playerId] || [];
+            
+            // For each gambler that picked this player, add their details
             tagsForPlayer.forEach(gamblerName => {
-                if (gamblerScores.hasOwnProperty(gamblerName)) {
-                    gamblerScores[gamblerName] += parseScore(player.total);
+                if (gamblerData.hasOwnProperty(gamblerName)) {
+                    // Don't add missed cut players to the total score
+                    if (!hasMissedCut) {
+                        gamblerData[gamblerName].totalScore += parsedPlayerScore;
+                    }
+                    gamblerData[gamblerName].players.push({
+                        name: `${player.firstName.charAt(0)}. ${player.lastName}`,
+                        score: parsedPlayerScore,
+                        hasMissedCut: hasMissedCut
+                    });
                 }
             });
         });
 
-        // Clear only the gambler cards, not the new cut score card
-        gamblersContainer.querySelectorAll('.gambler-card').forEach(card => card.remove());
-
+        // 3. Render the new, detailed cards
+        gamblersContainer.innerHTML = '';
         availableGamblers.forEach(gambler => {
-            const total = gamblerScores[gambler];
-            const scoreInfo = formatScore(total);
-
             const card = document.createElement('div');
-            card.className = 'gambler-card'; // Mark as a gambler card for easy removal
+            card.className = 'gambler-card';
+            
+            const gamblerInfo = gamblerData[gambler];
+            const finalScore = formatScore(gamblerInfo.totalScore);
+
+            // Build the list of players for the breakdown section
+            const playerBreakdownHtml = gamblerInfo.players.map(p => {
+                const playerScore = formatScore(p.score);
+                const missedCutClass = p.hasMissedCut ? 'missed-cut' : '';
+                const missedCutMarker = p.hasMissedCut ? ' (MC)' : '';
+                return `
+                    <div class="player-row ${missedCutClass}">
+                        <span class="player-name">${p.name}</span>
+                        <span class="player-score ${playerScore.className}">${playerScore.text}${missedCutMarker}</span>
+                    </div>
+                `;
+            }).join('');
+
             card.innerHTML = `
                 <div class="name">${gambler}</div>
-                <div class="score ${scoreInfo.className}">${scoreInfo.text}</div>
+                <div class="total-score ${finalScore.className}">${finalScore.text}</div>
+                <div class="player-breakdown">${playerBreakdownHtml}</div>
             `;
             gamblersContainer.appendChild(card);
         });
@@ -64,63 +101,34 @@ document.addEventListener('DOMContentLoaded', () => {
         fetch(url, options)
             .then(response => response.json())
             .then(data => {
-                leaderboardBody.innerHTML = ''; 
                 allPlayersData = data.leaderboardRows || [];
-
-                if (allPlayersData.length > 0) {
-                    allPlayersData.forEach(player => {
-                        const row = document.createElement('tr');
-                        const playerId = player.playerId;
-                        
-                        const tagsForPlayer = gamblerPicks[playerId] || [];
-                        const tagsHtml = tagsForPlayer.map(tag => `<span class="tag">${tag}</span>`).join('');
-                        
-                        const scoreInfo = formatScore(parseScore(player.total));
-                        const lastRound = player.rounds.length > 0 ? player.rounds[player.rounds.length - 1].strokes['$numberInt'] : 'N/A';
-                        
-                        row.innerHTML = `
-                            <td>${tagsHtml}</td>
-                            <td>${player.position}</td>
-                            <td>${player.firstName} ${player.lastName}</td>
-                            <td class="${scoreInfo.className}">${scoreInfo.text}</td>
-                            <td>${player.thru || 'N/A'}</td>
-                            <td>${lastRound}</td>
-                        `;
-                        leaderboardBody.appendChild(row);
-                    });
-                } else {
-                    leaderboardBody.innerHTML = '<tr><td colspan="6">No player data available.</td></tr>';
-                }
-
-                // First, update the gambler totals
-                updateGamblersTable();
-
-                // --- NEW: Create and display the Cut Score Card ---
-                // Remove the old cut score card if it exists, to prevent duplicates on refresh
-                const existingCutCard = document.getElementById('cut-score-card');
-                if (existingCutCard) {
-                    existingCutCard.remove();
-                }
-
-                // Safely get the cut score from the API data
+                
+                // Extract the cut score to pass to our update function
                 let cutScoreValue = 'N/A';
                 if (data.cutLines && data.cutLines.length > 0 && data.cutLines[0].cutScore) {
                     cutScoreValue = data.cutLines[0].cutScore;
                 }
 
-                // Create the new card element
-                const cutCard = document.createElement('div');
-                cutCard.id = 'cut-score-card'; // Give it an ID for easy removal
-                cutCard.className = 'gambler-card'; // Reuse the same style as the other cards
+                // Render the main leaderboard table (this part is simplified)
+                leaderboardBody.innerHTML = allPlayersData.map(player => {
+                    const tagsHtml = (gamblerPicks[player.playerId] || []).map(tag => `<span class="tag">${tag}</span>`).join('');
+                    const scoreInfo = formatScore(parseScore(player.total));
+                    return `
+                        <tr>
+                            <td>${tagsHtml}</td>
+                            <td>${player.position}</td>
+                            <td>${player.firstName} ${player.lastName}</td>
+                            <td class="${scoreInfo.className}">${scoreInfo.text}</td>
+                            <td>${player.thru || 'N/A'}</td>
+                            <td>${player.rounds.length > 0 ? player.rounds[player.rounds.length - 1].strokes['$numberInt'] : 'N/A'}</td>
+                        </tr>
+                    `;
+                }).join('');
 
-                const scoreInfo = formatScore(parseScore(cutScoreValue));
-                cutCard.innerHTML = `
-                    <div class="name">Cut Line</div>
-                    <div class="score ${scoreInfo.className}">${scoreInfo.text}</div>
-                `;
-                
-                // Add the new card to the beginning of the container to make it prominent
-                gamblersContainer.prepend(cutCard);
+                // Update both the Gambler and Cut Score cards
+                updateGamblersTable(cutScoreValue); 
+                // The Cut Score card from the previous step will now be created inside updateGamblersTable if you wish to combine them
+                // Or you can keep it separate as before. For this implementation, we focus on the gambler cards.
             })
             .catch(error => console.error("Failed to fetch data:", error));
     };
