@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="connect-src 'self' https://live-golf-data.p.rapidapi.com;">
-    <title>PGA Live Leaderboard</title>
+    <title>Golf Tracker</title>
     <style>
         /* --- General Page Styles --- */
         body {
@@ -52,14 +52,27 @@
         .gambler-card .total-score {
             font-weight: bold;
             font-size: 2.8em;
-            margin: 5px 0 10px 0;
+            margin-top: 5px;
+        }
+        /* NEW: Styles for Today's Score and Team Status */
+        .gambler-card .today-score {
+            font-size: 1.1em;
+            font-weight: 600;
+            margin-top: 5px;
+        }
+        .gambler-card .team-status {
+            font-size: 0.8em;
+            font-weight: 500;
+            color: #888;
+            text-transform: uppercase;
+            margin-top: 5px;
             padding-bottom: 10px;
             border-bottom: 1px solid #eee;
         }
-        /* NEW: Styles for player breakdown list */
         .gambler-card .player-breakdown {
             font-size: 0.9em;
             text-align: left;
+            margin-top: 10px;
         }
         .player-row {
             display: flex;
@@ -75,7 +88,6 @@
         .player-row .player-score {
             font-weight: 600;
         }
-        /* NEW: Style for players who missed the cut */
         .player-row.missed-cut {
             text-decoration: line-through;
             color: #999;
@@ -105,7 +117,7 @@
         <table id="leaderboard-table">
             <thead>
                 <tr>
-                    <th style="width: 20%;">Gambler</th><th style="width: 10%;">Pos</th><th>Player</th><th style="width: 10%;">Total</th><th style="width: 10%;">Thru</th><th style="width: 10%;">Round</th>
+                    <th style="width: 20%;">Tagged To</th><th style="width: 10%;">Pos</th><th>Player</th><th style="width: 10%;">Total</th><th style="width: 10%;">Thru</th><th style="width: 10%;">Round</th>
                 </tr>
             </thead>
             <tbody id="leaderboard-body"></tbody>
