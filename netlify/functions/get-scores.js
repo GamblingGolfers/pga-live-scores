@@ -24,7 +24,6 @@ exports.handler = async (event, context) => {
     const response = await fetch(url, options);
     const data = await response.json();
 
-    // Pass the response from RapidAPI through to the front-end
     return {
       statusCode: response.status,
       headers: { "Access-Control-Allow-Origin": "*" },
