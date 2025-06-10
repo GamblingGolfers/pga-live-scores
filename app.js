@@ -1,55 +1,83 @@
 document.addEventListener('DOMContentLoaded', () => {
 
     // --- Configuration ---
-    const apiKey = '04531f08dcmshe6e2b529c43c201p1557b0jsn0c81274dfc7c'; // <<< MAKE SURE YOUR API KEY IS HERE
-    const url = 'https://live-golf-data.p.rapidapi.com/leaderboard?orgId=1&tournId=020&year=2025';
+    const availableGamblers = ['Kris', 'Phil', 'Pet', 'Cal', 'Billy', 'Dean'];
+    let playerTags = JSON.parse(localStorage.getItem('playerTags')) || {};
+    let allPlayersData = []; // Will store the raw player data from the API
 
-    // --- API Request Options ---
+    // --- API Configuration ---
+    const apiKey = '04531f08dcmshe6e2b529c43c201p1557b0jsn0c81274dfc7c';
+    const url = 'https://live-golf-data.p.rapidapi.com/leaderboard?orgId=1&tournId=020&year=2025';
     const options = {
         method: 'GET',
-        headers: {
-            'x-rapidapi-key': apiKey,
-            'x-rapidapi-host': 'live-golf-data.p.rapidapi.com'
-        }
+        headers: { 'x-rapidapi-key': apiKey, 'x-rapidapi-host': 'live-golf-data.p.rapidapi.com' }
     };
 
     // --- Get HTML Elements ---
     const leaderboardBody = document.getElementById('leaderboard-body');
-    const favouritesBody = document.getElementById('favourites-body');
-    const favouritesPlaceholder = document.getElementById('favourites-placeholder');
+    const gamblersBody = document.getElementById('gamblers-body');
     const debugOutput = document.getElementById('debug-output');
 
-    // --- NEW: Function to show/hide the placeholder message in the Favourites table ---
-    const updateFavouritesPlaceholder = () => {
-        if (favouritesBody.children.length > 1) { // More than just the placeholder row
-             favouritesPlaceholder.style.display = 'none';
-        } else {
-             favouritesPlaceholder.style.display = '';
-        }
+    // --- NEW: Helper function to parse score strings like "E" or "-5" into numbers ---
+    const parseScore = (score) => {
+        if (score === 'E') return 0;
+        const number = parseInt(score, 10);
+        return isNaN(number) ? 0 : number; // Return 0 if score is not a number (e.g., "CUT")
+    };
+    
+    // --- NEW: Helper function to format numbers back into score strings ---
+    const formatScore = (score) => {
+        if (score === 0) return 'E';
+        if (score > 0) return `+${score}`;
+        return score.toString();
     };
 
-    // --- NEW: Event Listener for checkboxes ---
-    // We use event delegation on the main table body to handle all checkbox clicks.
-    leaderboardBody.addEventListener('change', (event) => {
-        // Only run if the clicked element was a checkbox
-        if (event.target.type === 'checkbox') {
-            const checkbox = event.target;
-            const originalRow = checkbox.closest('tr');
-            const playerId = checkbox.dataset.playerId;
+    // --- NEW: Core function to calculate and display gambler totals ---
+    const updateGamblersTable = () => {
+        // 1. Initialize scores for all gamblers to 0
+        const gamblerScores = {};
+        availableGamblers.forEach(gambler => {
+            gamblerScores[gambler] = 0;
+        });
 
-            if (checkbox.checked) {
-                // --- Add to Favourites ---
-                const newFavouriteRow = originalRow.cloneNode(true); // Clone the entire row
-                newFavouriteRow.id = `fav-${playerId}`; // Give the new row a unique ID
-                favouritesBody.appendChild(newFavouriteRow);
-            } else {
-                // --- Remove from Favourites ---
-                const rowToRemove = document.getElementById(`fav-${playerId}`);
-                if (rowToRemove) {
-                    rowToRemove.remove();
+        // 2. Loop through every player from the API data
+        allPlayersData.forEach(player => {
+            const tagsForPlayer = playerTags[player.playerId] || [];
+            
+            // 3. For each tag on a player, add their score to the corresponding gambler's total
+            tagsForPlayer.forEach(gamblerName => {
+                if (gamblerScores.hasOwnProperty(gamblerName)) {
+                    gamblerScores[gamblerName] += parseScore(player.total);
                 }
-            }
-            updateFavouritesPlaceholder();
+            });
+        });
+
+        // 4. Clear the old table and display the new totals
+        gamblersBody.innerHTML = '';
+        availableGamblers.forEach(gambler => {
+            const row = document.createElement('tr');
+            const total = gamblerScores[gambler];
+
+            row.innerHTML = `
+                <td>${gambler}</td>
+                <td>${formatScore(total)}</td>
+            `;
+            gamblersBody.appendChild(row);
+        });
+    };
+
+    // --- Event listener for the tag dropdowns ---
+    leaderboardBody.addEventListener('change', (event) => {
+        if (event.target.tagName === 'SELECT') {
+            const selectElement = event.target;
+            const playerId = selectElement.dataset.playerId;
+            const selectedTags = Array.from(selectElement.selectedOptions).map(option => option.value);
+
+            playerTags[playerId] = selectedTags;
+            localStorage.setItem('playerTags', JSON.stringify(playerTags));
+
+            // After any change, recalculate the gambler totals
+            updateGamblersTable();
         }
     });
 
@@ -64,34 +92,36 @@ document.addEventListener('DOMContentLoaded', () => {
             leaderboardBody.innerHTML = '';
 
             if (data && data.leaderboardRows && data.leaderboardRows.length > 0) {
-                data.leaderboardRows.forEach(player => {
-                    const row = document.createElement('tr');
-                    
-                    const position = player.position;
-                    const playerName = `${player.firstName} ${player.lastName}`;
-                    const totalToPar = player.total;
-                    const thru = player.thru || 'N/A';
-                    let lastRound = 'N/A';
-                    if (player.rounds && player.rounds.length > 0) {
-                        const lastRoundData = player.rounds[player.rounds.length - 1];
-                        if (lastRoundData.strokes && lastRoundData.strokes['$numberInt']) {
-                            lastRound = lastRoundData.strokes['$numberInt'];
-                        }
-                    }
+                allPlayersData = data.leaderboardRows; // Store player data globally
 
-                    // --- UPDATED: Add a new cell for the checkbox ---
+                allPlayersData.forEach(player => {
+                    const row = document.createElement('tr');
+                    const playerId = player.playerId;
+                    
+                    const selectOptions = availableGamblers.map(gambler => {
+                        const tagsForThisPlayer = playerTags[playerId] || [];
+                        const isSelected = tagsForThisPlayer.includes(gambler) ? 'selected' : '';
+                        return `<option value="${gambler}" ${isSelected}>${gambler}</option>`;
+                    }).join('');
+                    
+                    const selectDropdown = `<select multiple data-player-id="${playerId}" size="4">${selectOptions}</select>`;
+                    
+                    const lastRound = player.rounds.length > 0 ? player.rounds[player.rounds.length - 1].strokes['$numberInt'] : 'N/A';
+                    
                     row.innerHTML = `
-                        <td>
-                            <input type="checkbox" data-player-id="${player.playerId}">
-                        </td>
-                        <td>${position}</td>
-                        <td>${playerName}</td>
-                        <td>${totalToPar}</td>
-                        <td>${thru}</td>
+                        <td>${selectDropdown}</td>
+                        <td>${player.position}</td>
+                        <td>${player.firstName} ${player.lastName}</td>
+                        <td>${player.total}</td>
+                        <td>${player.thru || 'N/A'}</td>
                         <td>${lastRound}</td>
                     `;
                     leaderboardBody.appendChild(row);
                 });
+
+                // Perform the initial calculation and display the Gamblers table
+                updateGamblersTable();
+
             } else {
                 leaderboardBody.innerHTML = '<tr><td colspan="6">Leaderboard data received, but it contains no players.</td></tr>';
             }
