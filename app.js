@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    fetch('https://live-golf-data.p.rapidapi.com/leaderboard?orgId=1&tournId=012&year=2025', options)
+    fetch('https://live-golf-data.p.rapidapi.com/leaderboard?orgId=1&tournId=026&year=2025', options)
         .then(response => {
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
