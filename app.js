@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const gamblerPicks = {
         '37378': ['Kris', 'Cal'],   // Min Woo Lee
         '31323': ['Phil'],          // Gary Woodland
+        '58619': ['Kris']           // Kevin Velo
         // Example of a missed cut player (if J. Thomas was picked)
         // '30925': ['Kris']           // Justin Thomas
     };
