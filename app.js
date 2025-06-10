@@ -1,6 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
 
-    // --- UPDATED: Added your new pick for Kevin Velo ---
     const gamblerPicks = {
         '37378': ['Kris', 'Cal'],   // Min Woo Lee
         '31323': ['Phil'],          // Gary Woodland
@@ -10,7 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const availableGamblers = ['Kris', 'Phil', 'Pet', 'Cal', 'Billy', 'Dean'];
     let allPlayersData = []; 
 
-    const apiKey = 'YOUR_SECRET_API_KEY';
+    const apiKey = '04531f08dcmshe6e2b529c43c201p1557b0jsn0c81274dfc7c';
     const url = 'https://live-golf-data.p.rapidapi.com/leaderboard?orgId=1&tournId=020&year=2025';
     const options = {
         method: 'GET',
@@ -32,15 +31,12 @@ document.addEventListener('DOMContentLoaded', () => {
         return { text: score.toString(), className: 'score-under' };
     };
 
-    // --- UPDATED: This function now sorts the gamblers by score ---
     const updateGamblersTable = (cutScore) => {
-        // 1. Initialize data structure (unchanged)
         const gamblerData = {};
         availableGamblers.forEach(gambler => {
             gamblerData[gambler] = { totalScore: 0, players: [] };
         });
 
-        // 2. Process every player from the API (unchanged)
         allPlayersData.forEach(player => {
             const parsedPlayerScore = parseScore(player.total);
             const hasMissedCut = player.status === 'cut' || (cutScore !== 'N/A' && parsedPlayerScore > parseScore(cutScore));
@@ -60,30 +56,18 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
-        // --- NEW: Convert the gambler data object into a sortable array and sort it ---
-        const sortedGamblers = Object.entries(gamblerData).sort((a, b) => {
-            // a[1] and b[1] refer to the { totalScore, players } object
-            return a[1].totalScore - b[1].totalScore;
-        });
+        const sortedGamblers = Object.entries(gamblerData).sort((a, b) => a[1].totalScore - b[1].totalScore);
 
-        // 3. Render the cards using the newly sorted array
         gamblersContainer.innerHTML = '';
-        sortedGamblers.forEach(([gamblerName, gamblerInfo]) => { // Destructure the array entry
+        sortedGamblers.forEach(([gamblerName, gamblerInfo]) => {
             const card = document.createElement('div');
             card.className = 'gambler-card';
-            
             const finalScore = formatScore(gamblerInfo.totalScore);
-
             const playerBreakdownHtml = gamblerInfo.players.map(p => {
                 const playerScore = formatScore(p.score);
                 const missedCutClass = p.hasMissedCut ? 'missed-cut' : '';
                 const missedCutMarker = p.hasMissedCut ? ' (MC)' : '';
-                return `
-                    <div class="player-row ${missedCutClass}">
-                        <span class="player-name">${p.name}</span>
-                        <span class="player-score ${playerScore.className}">${playerScore.text}${missedCutMarker}</span>
-                    </div>
-                `;
+                return `<div class="player-row ${missedCutClass}"><span class="player-name">${p.name}</span><span class="player-score ${playerScore.className}">${playerScore.text}${missedCutMarker}</span></div>`;
             }).join('');
 
             card.innerHTML = `
@@ -97,7 +81,10 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const fetchLeaderboardData = () => {
         fetch(url, options)
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) { throw new Error(`HTTP error! status: ${response.status}`); }
+                return response.json();
+            })
             .then(data => {
                 allPlayersData = data.leaderboardRows || [];
                 
@@ -106,9 +93,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     cutScoreValue = data.cutLines[0].cutScore;
                 }
 
+                // UPDATED: More robust logic for building the table rows
                 leaderboardBody.innerHTML = allPlayersData.map(player => {
                     const tagsHtml = (gamblerPicks[player.playerId] || []).map(tag => `<span class="tag">${tag}</span>`).join('');
                     const scoreInfo = formatScore(parseScore(player.total));
+                    
+                    // ROBUSTNESS FIX: Safely check for round data before trying to access it
+                    let lastRound = 'N/A';
+                    if (player.rounds && player.rounds.length > 0) {
+                        const lastRoundData = player.rounds[player.rounds.length - 1];
+                        if (lastRoundData && lastRoundData.strokes && lastRoundData.strokes['$numberInt']) {
+                            lastRound = lastRoundData.strokes['$numberInt'];
+                        }
+                    }
+
                     return `
                         <tr>
                             <td>${tagsHtml}</td>
@@ -116,14 +114,23 @@ document.addEventListener('DOMContentLoaded', () => {
                             <td>${player.firstName} ${player.lastName}</td>
                             <td class="${scoreInfo.className}">${scoreInfo.text}</td>
                             <td>${player.thru || 'N/A'}</td>
-                            <td>${player.rounds.length > 0 ? player.rounds[player.rounds.length - 1].strokes['$numberInt'] : 'N/A'}</td>
+                            <td>${lastRound}</td>
                         </tr>
                     `;
                 }).join('');
 
                 updateGamblersTable(cutScoreValue); 
             })
-            .catch(error => console.error("Failed to fetch data:", error));
+            // UPDATED: The .catch block now displays errors on the page again
+            .catch(error => {
+                console.error("Failed to fetch data:", error);
+                // Display a helpful error message directly on the page
+                gamblersContainer.innerHTML = `<p style="color: #d9534f; font-weight: bold;">Could not load live data.</p>`;
+                leaderboardBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #d9534f;">
+                    <strong>Error: ${error.message}</strong>
+                    <br><br>This could be due to an invalid API key, exceeding the usage limit, or a network issue.
+                </td></tr>`;
+            });
     };
 
     fetchLeaderboardData(); 
