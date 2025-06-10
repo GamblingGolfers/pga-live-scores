@@ -10,8 +10,8 @@
         table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
         th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #ddd; }
         th { background-color: #f2f2f2; }
-        .placeholder-row td { text-align: center; color: #777; font-style: italic; }
-        #debug-output { display: none; } /* Hide the debug output by default now */
+        #debug-output { display: none; }
+        #gamblers-table th, #gamblers-table td { font-size: 1.1em; } /* Make Gambler totals bigger */
     </style>
 </head>
 <body>
@@ -20,11 +20,12 @@
     <table id="leaderboard-table">
         <thead>
             <tr>
-                <th>Favourite</th> <th>Position</th>
+                <th style="width: 15%;">Gambler Tag</th>
+                <th style="width: 10%;">Position</th>
                 <th>Player</th>
-                <th>Total</th>
-                <th>Thru</th>
-                <th>Round</th>
+                <th style="width: 10%;">Total</th>
+                <th style="width: 10%;">Thru</th>
+                <th style="width: 10%;">Round</th>
             </tr>
         </thead>
         <tbody id="leaderboard-body">
@@ -33,22 +34,16 @@
 
     <hr>
 
-    <h2>Favourites</h2>
-    <table id="favourites-table">
+    <h2>Gamblers' Totals</h2>
+    <table id="gamblers-table">
         <thead>
             <tr>
-                <th>Favourite</th> <th>Position</th>
-                <th>Player</th>
-                <th>Total</th>
-                <th>Thru</th>
-                <th>Round</th>
+                <th>Gambler</th>
+                <th>Combined Score</th>
             </tr>
         </thead>
-        <tbody id="favourites-body">
-            <tr class="placeholder-row" id="favourites-placeholder">
-                <td colspan="6">No favourites selected yet. Check a box above to add a player.</td>
-            </tr>
-        </tbody>
+        <tbody id="gamblers-body">
+            </tbody>
     </table>
 
     <h3>Debug Output:</h3>
