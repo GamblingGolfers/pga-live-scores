@@ -1,9 +1,18 @@
 document.addEventListener('DOMContentLoaded', () => {
 
+    // --- NEW "SOURCE OF TRUTH" ---
+    // This is the only place you need to edit.
+    // Assign players to gamblers by adding the player's ID and an array of names.
+    const gamblerPicks = {
+        '37378': ['Kris', 'Cal'],   // Min Woo Lee
+        '31323': ['Phil'],          // Gary Woodland
+        // --- Add more players here in the format: 'PLAYER_ID': ['GAMBLER_NAME'] ---
+        // e.g., '12345': ['Dean', 'Billy']
+    };
+
     // --- Configuration ---
     const availableGamblers = ['Kris', 'Phil', 'Pet', 'Cal', 'Billy', 'Dean'];
-    let playerTags = JSON.parse(localStorage.getItem('playerTags')) || {};
-    let allPlayersData = []; // Will store the raw player data from the API
+    let allPlayersData = []; 
 
     // --- API Configuration ---
     const apiKey = '04531f08dcmshe6e2b529c43c201p1557b0jsn0c81274dfc7c';
@@ -18,33 +27,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const gamblersBody = document.getElementById('gamblers-body');
     const debugOutput = document.getElementById('debug-output');
 
-    // --- NEW: Helper function to parse score strings like "E" or "-5" into numbers ---
+    // --- Helper Functions ---
     const parseScore = (score) => {
         if (score === 'E') return 0;
         const number = parseInt(score, 10);
-        return isNaN(number) ? 0 : number; // Return 0 if score is not a number (e.g., "CUT")
+        return isNaN(number) ? 0 : number;
     };
-    
-    // --- NEW: Helper function to format numbers back into score strings ---
     const formatScore = (score) => {
         if (score === 0) return 'E';
         if (score > 0) return `+${score}`;
         return score.toString();
     };
 
-    // --- NEW: Core function to calculate and display gambler totals ---
+    // --- Core function to calculate gambler totals ---
     const updateGamblersTable = () => {
-        // 1. Initialize scores for all gamblers to 0
         const gamblerScores = {};
-        availableGamblers.forEach(gambler => {
-            gamblerScores[gambler] = 0;
-        });
+        availableGamblers.forEach(gambler => { gamblerScores[gambler] = 0; });
 
-        // 2. Loop through every player from the API data
         allPlayersData.forEach(player => {
-            const tagsForPlayer = playerTags[player.playerId] || [];
+            // UPDATED: Reads from our hardcoded 'gamblerPicks' object
+            const tagsForPlayer = gamblerPicks[player.playerId] || [];
             
-            // 3. For each tag on a player, add their score to the corresponding gambler's total
             tagsForPlayer.forEach(gamblerName => {
                 if (gamblerScores.hasOwnProperty(gamblerName)) {
                     gamblerScores[gamblerName] += parseScore(player.total);
@@ -52,82 +55,61 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
-        // 4. Clear the old table and display the new totals
         gamblersBody.innerHTML = '';
         availableGamblers.forEach(gambler => {
             const row = document.createElement('tr');
-            const total = gamblerScores[gambler];
-
             row.innerHTML = `
                 <td>${gambler}</td>
-                <td>${formatScore(total)}</td>
+                <td>${formatScore(gamblerScores[gambler])}</td>
             `;
             gamblersBody.appendChild(row);
         });
     };
+    
+    // --- Data fetching and rendering function ---
+    const fetchLeaderboardData = () => {
+        fetch(url, options)
+            .then(response => response.json())
+            .then(data => {
+                debugOutput.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                leaderboardBody.innerHTML = ''; 
+                allPlayersData = data.leaderboardRows || [];
 
-    // --- Event listener for the tag dropdowns ---
-    leaderboardBody.addEventListener('change', (event) => {
-        if (event.target.tagName === 'SELECT') {
-            const selectElement = event.target;
-            const playerId = selectElement.dataset.playerId;
-            const selectedTags = Array.from(selectElement.selectedOptions).map(option => option.value);
+                if (allPlayersData.length > 0) {
+                    allPlayersData.forEach(player => {
+                        const row = document.createElement('tr');
+                        const playerId = player.playerId;
+                        
+                        // UPDATED: Displays tags as text instead of a dropdown
+                        const tagsForPlayer = gamblerPicks[playerId] || [];
+                        const tagsText = tagsForPlayer.join(', '); // e.g., "Kris, Cal"
+                        
+                        const lastRound = player.rounds.length > 0 ? player.rounds[player.rounds.length - 1].strokes['$numberInt'] : 'N/A';
+                        
+                        row.innerHTML = `
+                            <td>${tagsText}</td>
+                            <td>${player.position}</td>
+                            <td>${player.firstName} ${player.lastName}</td>
+                            <td>${player.total}</td>
+                            <td>${player.thru || 'N/A'}</td>
+                            <td>${lastRound}</td>
+                        `;
+                        leaderboardBody.appendChild(row);
+                    });
+                } else {
+                    leaderboardBody.innerHTML = '<tr><td colspan="6">No player data available.</td></tr>';
+                }
 
-            playerTags[playerId] = selectedTags;
-            localStorage.setItem('playerTags', JSON.stringify(playerTags));
-
-            // After any change, recalculate the gambler totals
-            updateGamblersTable();
-        }
-    });
-
-    // --- Fetch Data from API ---
-    fetch(url, options)
-        .then(response => {
-            if (!response.ok) { throw new Error(`HTTP error! status: ${response.status}`); }
-            return response.json();
-        })
-        .then(data => {
-            debugOutput.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
-            leaderboardBody.innerHTML = '';
-
-            if (data && data.leaderboardRows && data.leaderboardRows.length > 0) {
-                allPlayersData = data.leaderboardRows; // Store player data globally
-
-                allPlayersData.forEach(player => {
-                    const row = document.createElement('tr');
-                    const playerId = player.playerId;
-                    
-                    const selectOptions = availableGamblers.map(gambler => {
-                        const tagsForThisPlayer = playerTags[playerId] || [];
-                        const isSelected = tagsForThisPlayer.includes(gambler) ? 'selected' : '';
-                        return `<option value="${gambler}" ${isSelected}>${gambler}</option>`;
-                    }).join('');
-                    
-                    const selectDropdown = `<select multiple data-player-id="${playerId}" size="4">${selectOptions}</select>`;
-                    
-                    const lastRound = player.rounds.length > 0 ? player.rounds[player.rounds.length - 1].strokes['$numberInt'] : 'N/A';
-                    
-                    row.innerHTML = `
-                        <td>${selectDropdown}</td>
-                        <td>${player.position}</td>
-                        <td>${player.firstName} ${player.lastName}</td>
-                        <td>${player.total}</td>
-                        <td>${player.thru || 'N/A'}</td>
-                        <td>${lastRound}</td>
-                    `;
-                    leaderboardBody.appendChild(row);
-                });
-
-                // Perform the initial calculation and display the Gamblers table
                 updateGamblersTable();
+            })
+            .catch(error => {
+                console.error("Failed to fetch data:", error);
+            });
+    };
 
-            } else {
-                leaderboardBody.innerHTML = '<tr><td colspan="6">Leaderboard data received, but it contains no players.</td></tr>';
-            }
-        })
-        .catch(error => {
-            debugOutput.innerHTML = `<h3>An Error Occurred!</h3><p><strong>${error.toString()}</strong></p>`;
-            leaderboardBody.innerHTML = `<tr><td colspan="6">Failed to load data. See error details.</td></tr>`;
-        });
+    // --- REMOVED: The event listener for dropdowns is no longer needed. ---
+
+    // --- Initial setup and refresh interval ---
+    fetchLeaderboardData(); 
+    setInterval(fetchLeaderboardData, 60000); // Auto-refresh still works
 });
