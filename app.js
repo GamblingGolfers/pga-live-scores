@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const options = {
         method: 'GET',
         headers: {
-            'x-rapidapi-key': '53e012eec0msh9138d9196b9f91dp18d8e8jsn805f3b230ace', // <<< YOUR API KEY HERE
+            'x-rapidapi-key': '04531f08dcmshe6e2b529c43c201p1557b0jsn0c81274dfc7c', // <<< YOUR API KEY HERE
             'x-rapidapi-host': 'live-golf-data.p.rapidapi.com'
         }
     };
