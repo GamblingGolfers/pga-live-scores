@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
 
     // --- Configuration ---
-    const apiKey = 'YOUR_SECRET_API_KEY'; // <<< MAKE SURE YOUR API KEY IS HERE
+    const apiKey = '04531f08dcmshe6e2b529c43c201p1557b0jsn0c81274dfc7c'; // <<< MAKE SURE YOUR API KEY IS HERE
     const url = 'https://live-golf-data.p.rapidapi.com/leaderboard?orgId=1&tournId=020&year=2025';
 
     // --- API Request Options ---
