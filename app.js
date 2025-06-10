@@ -2,10 +2,20 @@
 
 document.addEventListener('DOMContentLoaded', () => {
 
-    // --- THIS IS A TEMPORARY TEST BLOCK ---
+// --- THIS IS THE FINAL, CORRECTED LIST ---
 const gamblerPicks = {
-    '37378': ['Kris'],   // Min Woo Lee
-    '31323': ['Phil']    // Gary Woodland
+    '37378': ['Kris'],          // Min Woo Lee
+    '31323': ['Phil'],          // Gary Woodland
+    '58619': ['Kris'],          // Kevin Velo
+    '46046': ['Dean'],          // Scottie Scheffler
+    '52666': ['Phil'],          // Sami Valimaki
+    '51766': ['Cal'],           // Wyndham Clark
+    '40250': ['Billy'],         // Taylor Pendrith
+    '28237': ['Dean'],          // Rory McIlroy
+    '38991': ['Billy'],         // Jorge Campillo  <-- Corrected quote and comma
+    '59018': ['Cal'],           // Ludvig Aberg    <-- Corrected comma
+    '35506': ['Pet'],           // Adam Hadwin     <-- Corrected comma
+    '54628': ['Pet']            // Tom Hoge
 };
 
     const availableGamblers = ['Kris', 'Phil', 'Pet', 'Cal', 'Billy', 'Dean'];
