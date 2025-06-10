@@ -2,12 +2,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const options = {
         method: 'GET',
         headers: {
-            'x-rapidapi-key': '04531f08dcmshe6e2b529c43c201p1557b0jsn0c81274dfc7c', // <<< YOUR API KEY HERE
+            'x-rapidapi-key': '04531f08dcmshe6e2b529c43c201p1557b0jsn0c81274dfc7c', // <-- IMPORTANT: Use your new key
             'x-rapidapi-host': 'live-golf-data.p.rapidapi.com'
         }
     };
 
-    fetch('https://live-golf-data.p.rapidapi.com/leaderboard?orgId=1&tournId=020&year=2025', options)
+    const url = 'https://live-golf-data.p.rapidapi.com/leaderboard?orgId=1&tournId=020&year=2025';
+
+    fetch(url, options)
         .then(response => {
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -15,29 +17,30 @@ document.addEventListener('DOMContentLoaded', () => {
             return response.json();
         })
         .then(data => {
-            const leaderboardBody = document.getElementById('leaderboard-body');
-            leaderboardBody.innerHTML = ''; // Clear existing data
+            console.log(data); // Good for debugging
 
-            if (data && data.leaderboard && data.leaderboard.players) {
+            const leaderboardBody = document.getElementById('leaderboard-body');
+            leaderboardBody.innerHTML = ''; 
+
+            if (data && data.leaderboard && data.leaderboard.players && data.leaderboard.players.length > 0) {
                 data.leaderboard.players.forEach(player => {
                     const row = document.createElement('tr');
 
-                    row.innerHTML = `
-                        <td>${player.position}</td>
-                        <td>${player.firstName} ${player.lastName}</td>
-                        <td>${player.total}</td>
-                        <td>${player.currentHole}</td>
-                    `;
+                    // --- ADJUSTMENTS BASED ON YOUR DATA SAMPLE ---
 
-                    leaderboardBody.appendChild(row);
-                });
-            } else {
-                leaderboardBody.innerHTML = '<tr><td colspan="5">No data available.</td></tr>';
-            }
-        })
-        .catch(error => {
-            console.error('Error fetching data:', error);
-            const leaderboardBody = document.getElementById('leaderboard-body');
-            leaderboardBody.innerHTML = `<tr><td colspan="5">1 Failed to load leaderboard data. See console for details.</td></tr>`;
-        });
-});
+                    const position = player.position;
+
+                    // CHANGED: Use firstName and lastName (camelCase)
+                    const playerName = `${player.firstName} ${player.lastName}`;
+
+                    // CHANGED: Use 'total' instead of 'total_to_par'
+                    const totalToPar = player.total;
+
+                    // IMPROVED: Use 'status' to determine what to show for 'Thru'
+                    // If the status is 'complete', we show 'F' for Finished.
+                    const thru = player.status === 'complete' ? 'F' : (player.thru || 'N/A');
+                    
+                    // CHANGED: Use 'currentRoundScore' for the round total. This is much more direct.
+                    const roundScore = player.currentRoundScore;
+
+                    row.innerHTML = `
