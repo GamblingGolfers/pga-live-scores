@@ -2,7 +2,7 @@
 
 exports.handler = async (event, context) => {
   const apiKey = process.env.RAPIDAPI_KEY;
-  const url = 'https://live-golf-data.p.rapidapi.com/leaderboard?orgId=1&tournId=020&year=2025';
+  const url = 'https://live-golf-data.p.rapidapi.com/leaderboard?orgId=1&tournId=026&year=2025';
   const apiHost = 'live-golf-data.p.rapidapi.com';
 
   if (!apiKey) {
