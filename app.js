@@ -3,18 +3,18 @@
 document.addEventListener('DOMContentLoaded', () => {
 
     const gamblerPicks = {
-        '37378': ['Kris', 'Cal'],   // Min Woo Lee
-        '31323': ['Phil'],          // Gary Woodland
-        '58619': ['Kris'],          // Kevin Velo
-        '46046': ['Dean'],          // Scottie Scheffler
-        '52666': ['Phil'],          // Sami Valimaki
-        '51766': ['Cal'],           // Wyndham Clark
-        '40250': ['Billy'],         // Taylor Pendrith
-        '28237': ['Dean'],          // Rory McIlroy
-        '38991': ['Billy'],         // Jorge Campillo
-        '59018': ['Cal'],           // Ludvig Aberg
-        '35506': ['Pet'],           // Adam Hadwin
-        '54628': ['Pet']            // Tom Hoge
+        '46046': ['Kris'],          // Scottie Scheffler
+        '28237': ['Phil'],          // Rory McIlroy
+        '47959': ['Kris'],          // Bryson DeChambeau
+        '54591': ['Dean'],          // Ben Griffin
+        '46970': ['Phil'],          // Jon Rahm
+        '30911': ['Cal'],           // Tom Fleetwood
+        '33448': ['Billy'],         // Justin Thomas
+        '52955': ['Dean'],          // Ludvig Aberg
+        '45486': ['Billy'],         // Joaquin Niemann
+        '33204': ['Cal'],           // Shane Lowry
+        '48081': ['Pet'],           // Xander Schauffele
+        '50525': ['Pet']            // Collin Morikawa
     };
 
     const availableGamblers = ['Kris', 'Phil', 'Pet', 'Cal', 'Billy', 'Dean'];
