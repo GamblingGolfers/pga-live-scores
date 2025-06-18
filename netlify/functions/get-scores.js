@@ -1,22 +1,27 @@
-// File: netlify/functions/get-scores.js
+// FINAL VERSION - This function now receives tournament parameters dynamically
 
 exports.handler = async (event, context) => {
   const apiKey = process.env.RAPIDAPI_KEY;
-  const url = 'https://live-golf-data.p.rapidapi.com/leaderboard?orgId=1&tournId=026&year=2025';
-  const apiHost = 'live-golf-data.p.rapidapi.com';
 
+  // --- NEW: Get tournament parameters from the request URL ---
+  const { orgId, tournId, year } = event.queryStringParameters;
+
+  // Safety checks for required parameters
   if (!apiKey) {
-    return { 
-      statusCode: 500, 
-      body: JSON.stringify({ error: 'API Key is missing from server environment.' }) 
-    };
+    return { statusCode: 500, body: JSON.stringify({ error: 'API Key is missing.' }) };
+  }
+  if (!tournId || !year) {
+    return { statusCode: 400, body: JSON.stringify({ error: 'Missing required tournament parameters.' }) };
   }
 
+  // --- NEW: Build the API URL dynamically ---
+  const url = `https://live-golf-data.p.rapidapi.com/leaderboard?orgId=${orgId || '1'}&tournId=${tournId}&year=${year}`;
+  
   const options = {
     method: 'GET',
     headers: {
       'x-rapidapi-key': apiKey,
-      'x-rapidapi-host': apiHost
+      'x-rapidapi-host': 'live-golf-data.p.rapidapi.com'
     }
   };
 
@@ -32,7 +37,7 @@ exports.handler = async (event, context) => {
   } catch (error) {
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: 'Failed to fetch data due to an internal function error.' })
+      body: JSON.stringify({ error: 'Failed to fetch data from the golf API.' })
     };
   }
 };
