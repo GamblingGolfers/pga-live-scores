@@ -1,44 +1,29 @@
-// FINAL VERSION - Includes "Today" score in main leaderboard
+// FINAL VERSION - Loads all configuration from external JSON files
 
 document.addEventListener('DOMContentLoaded', () => {
 
-    const gamblerPicks = {
-        '46046': ['Kris'],          // Scottie Scheffler
-        '28237': ['Phil'],          // Rory McIlroy
-        '47959': ['Kris'],          // Bryson DeChambeau
-        '54591': ['Dean'],          // Ben Griffin
-        '46970': ['Phil'],          // Jon Rahm
-        '30911': ['Cal'],           // Tom Fleetwood
-        '33448': ['Billy'],         // Justin Thomas
-        '52955': ['Dean'],          // Ludvig Aberg
-        '45486': ['Billy'],         // Joaquin Niemann
-        '33204': ['Cal'],           // Shane Lowry
-        '48081': ['Pet'],           // Xander Schauffele
-        '50525': ['Pet']            // Collin Morikawa
-    };
-
-    const availableGamblers = ['Kris', 'Phil', 'Pet', 'Cal', 'Billy', 'Dean'];
-    let allPlayersData = []; 
-
-    const url = '/.netlify/functions/get-scores'; 
+    // --- State & Configuration ---
+    // All config is now loaded from external files.
+    let gamblerPicks = {}; 
+    let availableGamblers = [];
+    let tournamentConfig = {};
 
     const leaderboardBody = document.getElementById('leaderboard-body');
     const gamblersContainer = document.getElementById('gamblers-container');
 
+    // --- Helper & Core Functions (unchanged) ---
     const parseScore = (score) => {
         if (typeof score !== 'string' || score.toUpperCase() === 'E' || !score) return 0;
         const number = parseInt(score, 10);
         return isNaN(number) ? 0 : number;
     };
-    
     const formatScore = (score) => {
         if (typeof score !== 'number' || isNaN(score)) return { text: 'N/A', className: 'score-even' };
         if (score === 0) return { text: 'E', className: 'score-even' };
         if (score > 0) return { text: `+${score}`, className: 'score-over' };
         return { text: score.toString(), className: 'score-under' };
     };
-
-    const updateGamblersTable = (cutScore) => {
+    const updateGamblersTable = (cutScore, tournamentRound) => {
         const gamblerData = {};
         availableGamblers.forEach(gambler => {
             gamblerData[gambler] = { totalScore: 0, todayScore: 0, players: [], hasMissedCutPlayer: false, missedCutCount: 0, totalPicks: 0 };
@@ -47,8 +32,12 @@ document.addEventListener('DOMContentLoaded', () => {
         allPlayersData.forEach(player => {
             if (!player || !player.playerId) return;
             const parsedPlayerScore = parseScore(player.total);
+            let hasMissedCut = player.status === 'cut';
+            const isCutFinalized = parseInt(tournamentRound, 10) > 2;
+            if (!hasMissedCut && isCutFinalized && cutScore !== 'N/A') {
+                if (parsedPlayerScore > parseScore(cutScore)) { hasMissedCut = true; }
+            }
             const parsedTodayScore = parseScore(player.currentRoundScore);
-            const hasMissedCut = player.status === 'cut' || (cutScore !== 'N/A' && parsedPlayerScore > parseScore(cutScore));
             const tagsForPlayer = gamblerPicks[player.playerId] || [];
             tagsForPlayer.forEach(gamblerName => {
                 const gambler = gamblerData[gamblerName];
@@ -75,9 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
         sortedGamblers.forEach(([gamblerName, gamblerInfo]) => {
             const card = document.createElement('div');
             card.className = 'gambler-card';
-            let finalScore = gamblerInfo.hasMissedCutPlayer
-                ? { text: formatScore(gamblerInfo.totalScore).text, className: 'score-over' }
-                : formatScore(gamblerInfo.totalScore);
+            let finalScore = gamblerInfo.hasMissedCutPlayer ? { text: formatScore(gamblerInfo.totalScore).text, className: 'score-over' } : formatScore(gamblerInfo.totalScore);
             const todayScoreInfo = formatScore(gamblerInfo.todayScore);
             const madeCutCount = gamblerInfo.totalPicks - gamblerInfo.missedCutCount;
             const teamStatusText = `${madeCutCount}/${gamblerInfo.totalPicks} MADE CUT`;
@@ -92,7 +79,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
     
+    // --- UPDATED: fetchLeaderboardData now builds the URL dynamically ---
     const fetchLeaderboardData = () => {
+        const { orgId, tournId, year } = tournamentConfig;
+        const url = `/.netlify/functions/get-scores?orgId=${orgId}&tournId=${tournId}&year=${year}`;
+
         fetch(url)
             .then(response => {
                 if (!response.ok) { throw new Error(`Request Failed: ${response.statusText} (${response.status})`); }
@@ -104,15 +95,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (data.cutLines && data.cutLines.length > 0 && data.cutLines[0].cutScore) {
                     cutScoreValue = data.cutLines[0].cutScore;
                 }
-                
+                let tournamentRound = 0;
+                if (data.roundId && data.roundId['$numberInt']) {
+                    tournamentRound = data.roundId['$numberInt'];
+                }
                 leaderboardBody.innerHTML = allPlayersData.map(player => {
                     if (!player || !player.playerId) return ''; 
                     const tagsHtml = (gamblerPicks[player.playerId] || []).map(tag => `<span class="tag">${tag}</span>`).join('');
                     const totalScoreInfo = formatScore(parseScore(player.total));
-                    
-                    // --- NEW: Get and format the current round score ---
                     const todayScoreInfo = formatScore(parseScore(player.currentRoundScore));
-                    
                     let lastRound = 'N/A';
                     if (player.rounds && player.rounds.length > 0) {
                         const lastRoundData = player.rounds[player.rounds.length - 1];
@@ -120,21 +111,9 @@ document.addEventListener('DOMContentLoaded', () => {
                             lastRound = lastRoundData.strokes['$numberInt'];
                         }
                     }
-                    // --- UPDATED: Add the new cell to the table row ---
-                    return `
-                        <tr>
-                            <td>${tagsHtml}</td>
-                            <td>${player.position || 'N/A'}</td>
-                            <td>${player.firstName || ''} ${player.lastName || ''}</td>
-                            <td class="${totalScoreInfo.className}">${totalScoreInfo.text}</td>
-                            <td class="${todayScoreInfo.className}">${todayScoreInfo.text}</td>
-                            <td>${player.thru || 'N/A'}</td>
-                            <td>${lastRound}</td>
-                        </tr>
-                    `;
+                    return `<tr><td>${tagsHtml}</td><td>${player.position || 'N/A'}</td><td>${player.firstName || ''} ${player.lastName || ''}</td><td class="${totalScoreInfo.className}">${totalScoreInfo.text}</td><td class="${todayScoreInfo.className}">${todayScoreInfo.text}</td><td>${player.thru || 'N/A'}</td><td>${lastRound}</td></tr>`;
                 }).join('');
-
-                updateGamblersTable(cutScoreValue); 
+                updateGamblersTable(cutScoreValue, tournamentRound); 
             })
             .catch(error => {
                 console.error("Error fetching or rendering data:", error);
@@ -143,6 +122,36 @@ document.addEventListener('DOMContentLoaded', () => {
             });
     };
 
-    fetchLeaderboardData(); 
-    setInterval(fetchLeaderboardData, 60000);
+    // --- UPDATED: Main function now loads both config files ---
+    const main = async () => {
+        try {
+            // Use Promise.all to fetch both configuration files at the same time
+            const [configResponse, picksResponse] = await Promise.all([
+                fetch('/config.json'),
+                fetch('/picks.json')
+            ]);
+
+            if (!configResponse.ok) throw new Error('Could not load config.json file.');
+            if (!picksResponse.ok) throw new Error('Could not load picks.json file.');
+            
+            const configData = await configResponse.json();
+            gamblerPicks = await picksResponse.json();
+
+            // Populate our state from the config file
+            availableGamblers = configData.gamblers;
+            tournamentConfig = configData.tournament;
+
+            // Now that config is loaded, fetch the live data and set up the refresh interval.
+            fetchLeaderboardData(); 
+            setInterval(fetchLeaderboardData, 60000);
+
+        } catch (error) {
+            console.error("Initialization failed:", error);
+            gamblersContainer.innerHTML = `<p style="color: #d9534f; font-weight: bold;">Error: Could not load configuration files.</p>`;
+        }
+    };
+
+    // Run the main initialization function.
+    main();
 });
+
