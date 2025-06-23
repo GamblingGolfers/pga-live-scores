@@ -4,7 +4,6 @@ import { getFirestore, collection, doc, getDoc, setDoc, updateDoc, arrayUnion, o
 
 document.addEventListener('DOMContentLoaded', () => {
 
-    // --- THIS IS THE RESTORED NAVIGATION LOGIC ---
     const navContainer = document.getElementById('nav-container');
     const pages = document.querySelectorAll('.page');
     if (navContainer) {
@@ -17,11 +16,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
-    // --- END OF RESTORED LOGIC ---
 
-    // This function will be called by app.js when the data is ready.
-    window.initializeAuctionFeature = () => {
-        // --- SILENT AUCTION LOGIC ---
+    (function() {
         const form = document.getElementById('auction-form');
         if (!form) return;
 
@@ -220,6 +216,34 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
         
-        window.initializeAuctionFeature = main;
+        // This is the main entry point for this script.
+        const initializeAuctionFeature = () => {
+            // This function is exposed globally so app.js can call it.
+            // It's designed to be called only once.
+            if (window.initializeAuctionFeature.hasBeenCalled) return;
+            window.initializeAuctionFeature.hasBeenCalled = true;
+            main();
+        };
+        window.initializeAuctionFeature = initializeAuctionFeature;
+        
+        // --- NEW: Robust initialization logic ---
+        // This actively waits for the data to be ready.
+        let attempts = 0;
+        const dataCheckInterval = setInterval(() => {
+            attempts++;
+            // If data exists, call the initializer and stop checking.
+            if (window.GOLF_DATA) {
+                clearInterval(dataCheckInterval);
+                window.initializeAuctionFeature();
+            } 
+            // If 10 seconds pass with no data, show an error.
+            else if (attempts > 40) { // 40 * 250ms = 10 seconds
+                clearInterval(dataCheckInterval);
+                if (!isInitialized) {
+                    setPageError("Error: Timed out waiting for leaderboard data. Refresh the page.");
+                }
+            }
+        }, 250);
+
     })();
 });
