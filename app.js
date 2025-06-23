@@ -1,9 +1,5 @@
-// FINAL VERSION - Uses the official player 'status' field for cut/wd logic.
-// NEW: Now shares fetched data globally to prevent multiple API calls.
-
 document.addEventListener('DOMContentLoaded', () => {
 
-    // --- State & Configuration ---
     let gamblerPicks = {};
     let availableGamblers = [];
     let tournamentConfig = {};
@@ -12,7 +8,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const leaderboardBody = document.getElementById('leaderboard-body');
     const gamblersContainer = document.getElementById('gamblers-container');
 
-    // --- Helper Functions ---
     const parseScore = (score) => {
         if (typeof score !== 'string' || score.toUpperCase() === 'E' || !score) return 0;
         const number = parseInt(score, 10);
@@ -25,7 +20,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return { text: score.toString(), className: 'score-under' };
     };
 
-    // --- Core Functions ---
     const updateGamblersTable = () => {
         const gamblerData = {};
         availableGamblers.forEach(gambler => {
@@ -100,12 +94,14 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(data => {
                 allPlayersData = data.leaderboardRows || [];
 
-                // --- NEW LINE ---
-                // Make the fetched data globally available for other scripts.
-                window.GOLF_DATA = { players: allPlayersData, config: tournamentConfig };
-                // Announce that the data is ready.
-                document.dispatchEvent(new CustomEvent('golfDataReady'));
-                // --- END NEW LINES ---
+                // --- THIS IS THE CRUCIAL CHANGE ---
+                // After successfully getting the data, make it available to other scripts
+                // and then call the function to initialize the auction page.
+                window.GOLF_DATA = { players: allPlayersData };
+                if (window.initializeAuctionFeature) {
+                    window.initializeAuctionFeature();
+                }
+                // --- END CHANGE ---
 
                 leaderboardBody.innerHTML = allPlayersData.map(player => {
                     if (!player || !player.playerId) return '';
@@ -125,8 +121,8 @@ document.addEventListener('DOMContentLoaded', () => {
             })
             .catch(error => {
                 console.error("Error fetching or rendering data:", error);
-                gamblersContainer.innerHTML = `<p style="color: #d9534f; font-weight: bold;">Could not load live data.</p>`;
-                leaderboardBody.innerHTML = `<tr><td colspan="7"><strong>Error:</strong> ${error.message}</td></tr>`;
+                if (gamblersContainer) gamblersContainer.innerHTML = `<p style="color: #d9534f; font-weight: bold;">Could not load live data.</p>`;
+                if (leaderboardBody) leaderboardBody.innerHTML = `<tr><td colspan="7"><strong>Error:</strong> ${error.message}</td></tr>`;
             });
     };
 
@@ -146,7 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
             setInterval(fetchLeaderboardData, 60000);
         } catch (error) {
             console.error("Initialization failed:", error);
-            gamblersContainer.innerHTML = `<p style="color: #d9534f; font-weight: bold;">Error: ${error.message}</p>`;
+            if (gamblersContainer) gamblersContainer.innerHTML = `<p style="color: #d9534f; font-weight: bold;">Error: ${error.message}</p>`;
         }
     };
 
