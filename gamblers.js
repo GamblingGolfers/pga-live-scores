@@ -17,12 +17,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // --- SILENT AUCTION LOGIC ---
     (function() {
         const form = document.getElementById('auction-form');
         if (!form) return;
 
         let ALL_PLAYERS = [];
         let GAMBLERS = [];
+        let isInitialized = false; // Prevents running initialization multiple times
         const MIN_BID_INCREMENT = 5;
         const ABSOLUTE_MIN_BID = 10;
         
@@ -65,13 +67,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const renderAuctionStatus = (auctionData) => {
             auctionStatusContainer.innerHTML = '';
             const playersWithBids = Object.keys(auctionData);
-
             if (playersWithBids.length === 0) {
                 auctionStatusContainer.innerHTML = `<p style="color: var(--text-muted-color);">No bids placed yet. Be the first!</p>`;
                 return;
             }
             const sortedPlayerIds = playersWithBids.sort((a, b) => auctionData[a].playerName.localeCompare(auctionData[b].playerName));
-
             sortedPlayerIds.forEach(playerId => {
                 const playerData = auctionData[playerId];
                 const highestBid = Math.max(...playerData.bids.map(b => b.amount));
@@ -89,13 +89,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const renderFinishedResults = (auctionData) => {
             auctionResultsContainer.innerHTML = '';
             const playersWithBids = Object.keys(auctionData);
-
             if (playersWithBids.length === 0) {
                 auctionResultsContainer.innerHTML = `<p style="color: var(--text-muted-color);">The auction finished with no bids placed.</p>`;
                 return;
             }
             const sortedPlayerIds = playersWithBids.sort((a, b) => auctionData[a].playerName.localeCompare(auctionData[b].playerName));
-             
             sortedPlayerIds.forEach(playerId => {
                  const playerData = auctionData[playerId];
                  const winningBid = playerData.bids.reduce((max, bid) => bid.amount > max.amount ? bid : max);
@@ -184,6 +182,9 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         const initializeAuctionPage = async () => {
+            if (isInitialized) return; // Don't run this function more than once
+            isInitialized = true;
+
             try {
                 const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
                 if (token) await signInWithCustomToken(firebaseAuth, token); else await signInAnonymously(firebaseAuth);
@@ -216,8 +217,25 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
+        // --- NEW: Robust initialization logic ---
+        // Listen for the event from app.js as the primary trigger
         document.addEventListener('golfDataReady', initializeAuctionPage);
-        if (window.GOLF_DATA) initializeAuctionPage();
         
+        // As a fallback, poll for the data in case the event is missed.
+        let attempts = 0;
+        const dataCheckInterval = setInterval(() => {
+            attempts++;
+            // If data exists and we haven't initialized yet, run it.
+            if (window.GOLF_DATA && !isInitialized) {
+                clearInterval(dataCheckInterval);
+                initializeAuctionPage();
+            } 
+            // If we've tried for 10 seconds and still no data, show an error.
+            else if (attempts > 40 && !isInitialized) { // 40 * 250ms = 10 seconds
+                clearInterval(dataCheckInterval);
+                setPageError("Error: Timed out waiting for leaderboard data. Please refresh.");
+            }
+        }, 250);
+
     })();
 });
