@@ -11,7 +11,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
-        /* All of your original styles are preserved */
         :root {
             --bg-color: #121212;
             --card-color: rgba(38, 38, 38, 0.7);
@@ -65,16 +64,25 @@
         #leaderboard-table tbody tr { transition: background-color 0.2s ease; }
         #leaderboard-table tbody tr:hover { background-color: var(--hover-color); }
         #leaderboard-table td:nth-child(2), #leaderboard-table td:nth-child(4), #leaderboard-table td:nth-child(5), #leaderboard-table td:nth-child(6), #leaderboard-table td:nth-child(7) { text-align: center; font-weight: 500; }
-        #page-gamblers-content { background: var(--card-color); backdrop-filter: blur(10px); padding: 30px; border-radius: 12px; border: 1px solid var(--border-color); }
-        #bet-form label { display: block; font-weight: 600; margin-bottom: 8px; font-size: 0.9em; }
-        #bet-form input, #bet-form select { width: 100%; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; color: var(--text-color); font-family: 'Inter', sans-serif; font-size: 1em; margin-top: 5px; }
-        #bet-form input:focus, #bet-form select:focus { outline: none; border-color: var(--accent-color); box-shadow: 0 0 10px rgba(0, 170, 255, 0.3); }
-        #bet-form select option { background: var(--bg-color); color: var(--text-color); }
-        #bet-form .selections-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
-        #bet-form button { width: 100%; background: var(--accent-color); border: none; padding: 15px; border-radius: 8px; color: #fff; font-weight: 700; font-size: 1.1em; cursor: pointer; transition: all 0.3s ease; margin-top: 20px; }
-        #bet-form button:hover { box-shadow: 0 0 20px rgba(0, 170, 255, 0.5); transform: translateY(-2px); }
-        #bet-form button:disabled { background: #555; color: #999; cursor: not-allowed; }
-        #bets-container .gambler-card { text-align: left; }
+        
+        /* Styles for Silent Auction Page */
+        #auction-page-layout { display: grid; grid-template-columns: 1fr; gap: 40px; }
+        @media (min-width: 900px) {
+            #auction-page-layout { grid-template-columns: 350px 1fr; }
+        }
+        #auction-form-container { background: var(--card-color); backdrop-filter: blur(10px); padding: 30px; border-radius: 12px; border: 1px solid var(--border-color); }
+        #auction-form label { display: block; font-weight: 600; margin-bottom: 8px; font-size: 0.9em; }
+        #auction-form input, #auction-form select { width: 100%; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; color: var(--text-color); font-family: 'Inter', sans-serif; font-size: 1em; margin-top: 5px; }
+        #auction-form select option { background: var(--bg-color); color: var(--text-color); }
+        #auction-form button { width: 100%; background: var(--accent-color); border: none; padding: 15px; border-radius: 8px; color: #fff; font-weight: 700; font-size: 1.1em; cursor: pointer; transition: all 0.3s ease; margin-top: 20px; }
+        #auction-form button:hover { box-shadow: 0 0 20px rgba(0, 170, 255, 0.5); transform: translateY(-2px); }
+        #auction-form button:disabled { background: #555; color: #999; cursor: not-allowed; }
+        #auction-status-container, #auction-results-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
+        .auction-card { background: var(--card-color); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); }
+        .auction-card .player-name { font-weight: 700; font-size: 1.1em; color: var(--accent-color); }
+        .auction-card .bid-info { margin-top: 15px; font-size: 0.9em; }
+        .auction-card .highest-bid { font-weight: 700; font-size: 1.5em; color: var(--text-color); margin-top: 5px; }
+        .auction-card .winner-name { font-weight: 600; font-size: 1em; color: var(--score-green); }
     </style>
 </head>
 <body>
@@ -84,13 +92,12 @@
             <h1>Golf Suite</h1>
             <div id="nav-container" class="nav-buttons">
                 <button data-page="leaderboard" class="nav-button active">Leaderboard</button>
-                <button data-page="gamblers" class="nav-button">Gamblers Golf</button>
+                <button data-page="gamblers" class="nav-button">Silent Auction</button>
             </div>
         </header>
 
         <!-- Page 1: Original Leaderboard Content -->
         <div id="page-leaderboard" class="page">
-            <!-- This h1 is from your original file; app.js may rely on it. -->
             <h1 style="display: none;">Discriminatory Gamblers - Golf Tracker</h1>
             <h2>Gamblers' Scores</h2>
             <div id="gamblers-container"></div>
@@ -98,58 +105,60 @@
             <table id="leaderboard-table">
                 <thead>
                     <tr>
-                        <th style="width: 20%;">Gambler</th>
-                        <th style="width: 10%;">Pos</th>
-                        <th>Player</th>
-                        <th style="width: 10%;">Total</th>
-                        <th style="width: 10%;">Today</th>
-                        <th style="width: 10%;">Thru</th>
-                        <th style="width: 10%;">Round</th>
+                        <th style="width: 20%;">Gambler</th><th style="width: 10%;">Pos</th><th>Player</th><th style="width: 10%;">Total</th><th style="width: 10%;">Today</th><th style="width: 10%;">Thru</th><th style="width: 10%;">Round</th>
                     </tr>
                 </thead>
                 <tbody id="leaderboard-body"></tbody>
             </table>
         </div>
 
-        <!-- Page 2: New Gamblers Golf Content -->
+        <!-- Page 2: New Silent Auction Content -->
         <div id="page-gamblers" class="page hidden">
-            <h1 style="font-size: 2em; margin-bottom: 20px;">Gamblers Golf - Place Your Bets</h1>
-            <div id="page-gamblers-content">
-                 <form id="bet-form">
+            <h1 id="auction-main-title" style="font-size: 2em; margin-bottom: 20px;">Silent Auction</h1>
+            
+            <div id="auction-active-view">
+                <div id="auction-page-layout">
+                    <div id="auction-form-container">
+                         <h2 style="margin-top: 0; border: none;">Place a Bid</h2>
+                         <form id="auction-form">
+                            <div style="margin-bottom: 20px;">
+                                <label for="auction-gambler-select">Your Name</label>
+                                <select id="auction-gambler-select" disabled><option>Loading...</option></select>
+                            </div>
+                            <div style="margin-bottom: 20px;">
+                                <label for="auction-player-select">Player</label>
+                                <select id="auction-player-select" disabled><option>Loading...</option></select>
+                            </div>
+                            <div>
+                                 <label for="auction-bid-amount">Your Bid Amount (£)</label>
+                                <input type="number" id="auction-bid-amount" min="10" placeholder="e.g., 55">
+                            </div>
+                            <div id="auction-error-message" style="color: var(--danger-color); margin-top: 15px; text-align: center; font-weight: 600; min-height: 20px;"></div>
+                            <button type="submit" id="auction-submit-button" disabled>Place Bid</button>
+                        </form>
+                    </div>
                     <div>
-                        <label for="gambler-name">Gambler's Name</label>
-                        <select id="gambler-name" disabled><option>Loading Gamblers...</option></select>
-                    </div>
-                    <div class="selections-grid">
-                        <div>
-                            <label for="golfer-1">Pick 1</label>
-                            <select id="golfer-1" disabled><option>Loading Players...</option></select>
-                            <label for="value-1" style="margin-top: 15px;">Bet Amount (£)</label>
-                            <input type="number" id="value-1" min="10" placeholder="e.g., 50">
-                        </div>
-                         <div>
-                            <label for="golfer-2">Pick 2</label>
-                            <select id="golfer-2" disabled><option>Loading Players...</option></select>
-                             <label for="value-2" style="margin-top: 15px;">Bet Amount (£)</label>
-                            <input type="number" id="value-2" min="10" placeholder="e.g., 25">
+                        <h2 style="margin-top: 0; border: none;">Live Auction Status</h2>
+                        <div id="auction-status-container">
+                            <p style="color: var(--text-muted-color);">Loading auction status...</p>
                         </div>
                     </div>
-                    <div id="error-message" style="color: var(--danger-color); margin-top: 15px; text-align: center; font-weight: 600; min-height: 20px;"></div>
-                    <button type="submit" id="submit-button" disabled>Submit Picks</button>
-                </form>
-            </div>
-            <div class="mt-12">
-                <h2 style="margin-top: 40px;">Live Bets</h2>
-                <div id="bets-container" style="display: grid; grid-template-columns: 1fr; gap: 20px;">
-                    <p style="color: var(--text-muted-color);">Loading Live Bets...</p>
                 </div>
+            </div>
+
+            <div id="auction-finished-view" class="hidden">
+                 <h2 style="margin-top: 0; border: none;">Final Results</h2>
+                 <div id="auction-results-container">
+                     <p style="color: var(--text-muted-color);">Calculating results...</p>
+                 </div>
+            </div>
+             <div id="auction-not-started-view" class="hidden" style="text-align: center; padding: 40px; background: var(--card-color); border-radius: 12px;">
+                 <p>The auction has not started yet. Please check back later.</p>
             </div>
         </div>
     </div>
     
-    <!-- Your original script for the leaderboard -->
     <script src="app.js"></script>
-    <!-- NEW: Script for the new Gamblers Golf page -->
     <script src="gamblers.js" defer></script>
 </body>
 </html>
