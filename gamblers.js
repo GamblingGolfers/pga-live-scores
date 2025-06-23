@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let ALL_PLAYERS = [];
         let GAMBLERS = [];
-        const AUCTION_STORAGE_KEY = 'dgg_silent_auction_data_v2';
+        const AUCTION_STORAGE_KEY = 'dgg_silent_auction_data_v3';
         const MIN_BID_INCREMENT = 5;
         const ABSOLUTE_MIN_BID = 10;
 
@@ -41,6 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const auctionStatusContainer = document.getElementById('auction-status-container');
         const auctionResultsContainer = document.getElementById('auction-results-container');
         const mainTitle = document.getElementById('auction-main-title');
+        const statusIndicator = document.getElementById('auction-status-indicator');
 
 
         const setPageError = (message) => {
@@ -64,9 +65,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const getAuctionData = () => JSON.parse(localStorage.getItem(AUCTION_STORAGE_KEY) || '{}');
         const saveAuctionData = (data) => localStorage.setItem(AUCTION_STORAGE_KEY, JSON.stringify(data));
         
-        /**
-         * Renders the status of the auction for ONLY players with bids.
-         */
         const renderActiveAuctionStatus = () => {
             const auctionData = getAuctionData();
             auctionStatusContainer.innerHTML = '';
@@ -77,20 +75,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 auctionStatusContainer.innerHTML = `<p style="color: var(--text-muted-color);">No bids have been placed yet. Be the first!</p>`;
                 return;
             }
-
-            // Sort players alphabetically by name before displaying
             const sortedPlayerIds = playersWithBids.sort((a, b) => {
                 const playerA = ALL_PLAYERS.find(p => p.id === a);
                 const playerB = ALL_PLAYERS.find(p => p.id === b);
-                if (playerA && playerB) {
-                    return playerA.name.localeCompare(playerB.name);
-                }
-                return 0;
+                return playerA && playerB ? playerA.name.localeCompare(playerB.name) : 0;
             });
 
             sortedPlayerIds.forEach(playerId => {
                 const player = ALL_PLAYERS.find(p => p.id === playerId);
-                if (!player) return; // Don't render if player isn't in master list
+                if (!player) return; 
 
                 const playerData = auctionData[playerId];
                 const bidCount = playerData.bids.length;
@@ -159,9 +152,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }, 500);
         };
         
-        /**
-         * Renders the final results for ONLY players who received bids.
-         */
         const renderFinishedResults = () => {
             const auctionData = getAuctionData();
             auctionResultsContainer.innerHTML = '';
@@ -171,20 +161,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 auctionResultsContainer.innerHTML = `<p style="color: var(--text-muted-color);">The auction finished with no bids placed.</p>`;
                 return;
             }
-            
-            // Sort players alphabetically by name before displaying results
+
             const sortedPlayerIds = playersWithBids.sort((a, b) => {
-                const playerA = ALL_PLAYERS.find(p => p.id === a);
-                const playerB = ALL_PLAYERS.find(p => p.id === b);
-                if (playerA && playerB) {
-                    return playerA.name.localeCompare(playerB.name);
-                }
-                return 0;
+                 const playerA = ALL_PLAYERS.find(p => p.id === a);
+                 const playerB = ALL_PLAYERS.find(p => p.id === b);
+                 return playerA && playerB ? playerA.name.localeCompare(playerB.name) : 0;
             });
 
             sortedPlayerIds.forEach(playerId => {
                 const player = ALL_PLAYERS.find(p => p.id === playerId);
-                if (!player) return; // Skip if player is no longer in the master list
+                if (!player) return;
 
                 const playerData = auctionData[playerId];
                 const winningBid = playerData.bids.reduce((max, bid) => bid.amount > max.amount ? bid : max);
@@ -202,30 +188,43 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         const setupPageByStatus = (status) => {
+            // Hide all views initially
             activeView.classList.add('hidden');
             finishedView.classList.add('hidden');
             notStartedView.classList.add('hidden');
+            
+            // Set status indicator text and color
+            if (statusIndicator) {
+                 switch (status) {
+                    case 'active':
+                        statusIndicator.textContent = 'Active';
+                        statusIndicator.style.backgroundColor = 'var(--status-green)';
+                        activeView.classList.remove('hidden');
+                        break;
+                    case 'finished':
+                        statusIndicator.textContent = 'Finished';
+                        statusIndicator.style.backgroundColor = 'var(--status-red)';
+                        finishedView.classList.remove('hidden');
+                        break;
+                    case 'not_started':
+                    default:
+                        statusIndicator.textContent = 'Not Started';
+                        statusIndicator.style.backgroundColor = 'var(--status-orange)';
+                        notStartedView.classList.remove('hidden');
+                        break;
+                }
+            }
 
-            switch (status) {
-                case 'active':
-                    mainTitle.textContent = 'Silent Auction';
-                    activeView.classList.remove('hidden');
-                    populateDropdown(gamblerSelect, GAMBLERS, 'Select Your Name');
-                    populateDropdown(playerSelect, ALL_PLAYERS, 'Select a Player');
-                    submitButton.disabled = false;
-                    form.addEventListener('submit', handleFormSubmit);
-                    renderActiveAuctionStatus();
-                    break;
-                case 'finished':
-                    mainTitle.textContent = 'Auction Results';
-                    finishedView.classList.remove('hidden');
-                    renderFinishedResults();
-                    break;
-                case 'not_started':
-                default:
-                    mainTitle.textContent = 'Auction Not Started';
-                    notStartedView.classList.remove('hidden');
-                    break;
+
+            // Run view-specific logic
+            if (status === 'active') {
+                populateDropdown(gamblerSelect, GAMBLERS, 'Select Your Name');
+                populateDropdown(playerSelect, ALL_PLAYERS, 'Select a Player');
+                submitButton.disabled = false;
+                form.addEventListener('submit', handleFormSubmit);
+                renderActiveAuctionStatus();
+            } else if (status === 'finished') {
+                renderFinishedResults();
             }
         };
 
@@ -258,7 +257,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
         };
 
-        // --- Initialization ---
         document.addEventListener('golfDataReady', initializeAuctionPage);
         if (window.GOLF_DATA) {
             initializeAuctionPage();
