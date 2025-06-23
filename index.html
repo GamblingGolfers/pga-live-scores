@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Using your original, correct CSP -->
     <meta http-equiv="Content-Security-Policy" content="connect-src 'self' https://live-golf-data.p.rapidapi.com;">
     <title>Discriminatory Gamblers - Golf Suite</title>
     
@@ -12,7 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
-        /* All styles are preserved from your original file, with additions for new elements */
+        /* All of your original styles are preserved */
         :root {
             --bg-color: #121212;
             --card-color: rgba(38, 38, 38, 0.7);
@@ -89,7 +88,10 @@
             </div>
         </header>
 
+        <!-- Page 1: Original Leaderboard Content -->
         <div id="page-leaderboard" class="page">
+            <!-- This h1 is from your original file; app.js may rely on it. -->
+            <h1 style="display: none;">Discriminatory Gamblers - Golf Tracker</h1>
             <h2>Gamblers' Scores</h2>
             <div id="gamblers-container"></div>
             <h2>US OPEN 2025 - Leaderboard</h2>
@@ -109,6 +111,7 @@
             </table>
         </div>
 
+        <!-- Page 2: New Gamblers Golf Content -->
         <div id="page-gamblers" class="page hidden">
             <h1 style="font-size: 2em; margin-bottom: 20px;">Gamblers Golf - Place Your Bets</h1>
             <div id="page-gamblers-content">
@@ -144,166 +147,9 @@
         </div>
     </div>
     
+    <!-- Your original script for the leaderboard -->
     <script src="app.js"></script>
-
-    <script>
-        // Self-contained script for navigation and the new Gamblers Golf page
-        document.addEventListener('DOMContentLoaded', () => {
-
-            // --- PAGE SWITCHING ---
-            const navContainer = document.getElementById('nav-container');
-            const pages = document.querySelectorAll('.page');
-            navContainer.addEventListener('click', (e) => {
-                if (e.target.classList.contains('nav-button')) {
-                    const targetPageId = e.target.dataset.page;
-                    pages.forEach(p => p.classList.toggle('hidden', p.id !== `page-${targetPageId}`));
-                    navContainer.querySelectorAll('.nav-button').forEach(btn => btn.classList.remove('active'));
-                    e.target.classList.add('active');
-                }
-            });
-
-            // --- GAMBLERS GOLF LOGIC ---
-            (function() {
-                const form = document.getElementById('bet-form');
-                if (!form) return; // Only run if we're on a page with the form
-
-                let ALL_PLAYERS = [];
-                const BETS_STORAGE_KEY = 'dgg_live_bets';
-
-                const gamblerSelect = document.getElementById('gambler-name');
-                const golfer1Select = document.getElementById('golfer-1');
-                const value1Input = document.getElementById('value-1');
-                const golfer2Select = document.getElementById('golfer-2');
-                const value2Input = document.getElementById('value-2');
-                const errorMessageDiv = document.getElementById('error-message');
-                const betsContainer = document.getElementById('bets-container');
-                const submitButton = document.getElementById('submit-button');
-
-                const setFormError = (message) => {
-                    const contentDiv = document.getElementById('page-gamblers-content');
-                    contentDiv.innerHTML = `<p style="color: var(--danger-color); text-align: center; font-weight: 600;">${message}</p>`;
-                };
-                
-                const populateDropdown = (select, data, placeholder, isObject = false) => {
-                    select.innerHTML = `<option value="">${placeholder}</option>`;
-                    data.forEach(item => {
-                        const option = document.createElement('option');
-                        if (isObject) { option.value = item.id; option.textContent = item.name; } 
-                        else { option.value = item; option.textContent = item; }
-                        select.appendChild(option);
-                    });
-                    select.disabled = false;
-                };
-
-                const updateGolferDropdowns = () => {
-                    const val1 = golfer1Select.value;
-                    const val2 = golfer2Select.value;
-                    Array.from(golfer2Select.options).forEach(opt => opt.disabled = (opt.value && opt.value === val1));
-                    Array.from(golfer1Select.options).forEach(opt => opt.disabled = (opt.value && opt.value === val2));
-                };
-
-                const renderBets = () => {
-                    const bets = JSON.parse(localStorage.getItem(BETS_STORAGE_KEY) || '[]');
-                    betsContainer.innerHTML = '';
-                    if (bets.length === 0) {
-                        betsContainer.innerHTML = `<p style="color: var(--text-muted-color);">No bets submitted yet.</p>`;
-                        return;
-                    }
-                    const sortedBets = bets.sort((a,b) => b.timestamp - a.timestamp);
-                    sortedBets.forEach(bet => {
-                        const card = document.createElement('div');
-                        card.className = 'gambler-card';
-                        card.innerHTML = `
-                            <div class="name" style="color: var(--accent-color);">${bet.gamblerName}</div>
-                            <div class="player-breakdown" style="margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 15px;">
-                                <div class="player-row"><span>Pick 1: ${bet.golfer1Name}</span><span class="player-score" style="color: var(--text-color);">£${parseFloat(bet.bet1).toFixed(2)}</span></div>
-                                <div class="player-row"><span>Pick 2: ${bet.golfer2Name}</span><span class="player-score" style="color: var(--text-color);">£${parseFloat(bet.bet2).toFixed(2)}</span></div>
-                            </div>
-                        `;
-                        betsContainer.appendChild(card);
-                    });
-                };
-                
-                const handleFormSubmit = (e) => {
-                    e.preventDefault();
-                    errorMessageDiv.textContent = '';
-                    if (!gamblerSelect.value || !golfer1Select.value || !golfer2Select.value || !value1Input.value || !value2Input.value) {
-                        errorMessageDiv.textContent = 'All fields are required.'; return;
-                    }
-                    if (golfer1Select.value === golfer2Select.value) {
-                        errorMessageDiv.textContent = 'You must select two different golfers.'; return;
-                    }
-                    if (parseFloat(value1Input.value) < 10 || parseFloat(value2Input.value) < 10) {
-                        errorMessageDiv.textContent = 'Minimum bet is £10 for each pick.'; return;
-                    }
-
-                    submitButton.disabled = true;
-                    submitButton.textContent = 'Submitting...';
-
-                    const currentBets = JSON.parse(localStorage.getItem(BETS_STORAGE_KEY) || '[]');
-                    const newBet = {
-                        gamblerName: gamblerSelect.value,
-                        golfer1Name: golfer1Select.options[golfer1Select.selectedIndex].text,
-                        bet1: parseFloat(value1Input.value),
-                        golfer2Name: golfer2Select.options[golfer2Select.selectedIndex].text,
-                        bet2: parseFloat(value2Input.value),
-                        timestamp: Date.now()
-                    };
-                    currentBets.push(newBet);
-                    localStorage.setItem(BETS_STORAGE_KEY, JSON.stringify(currentBets));
-
-                    renderBets();
-                    form.reset();
-                    updateGolferDropdowns();
-
-                    setTimeout(() => {
-                        submitButton.disabled = false;
-                        submitButton.textContent = 'Submit Picks';
-                    }, 500);
-                };
-                
-                // --- Initialization ---
-                const initializeGamblersPage = async () => {
-                    try {
-                        const configResponse = await fetch('/config.json');
-                        if (!configResponse.ok) throw new Error(`HTTP error! Status: ${configResponse.status}`);
-                        const configData = await configResponse.json();
-
-                        const scoresUrl = `/.netlify/functions/get-scores?orgId=${configData.tournament.orgId}&tournId=${configData.tournament.tournId}&year=${configData.tournament.year}`;
-                        const scoresResponse = await fetch(scoresUrl);
-                        if (!scoresResponse.ok) throw new Error(`HTTP error! Status: ${scoresResponse.status}`);
-                        const scoresData = await scoresResponse.json();
-
-                        ALL_PLAYERS = (scoresData.leaderboardRows || []).map(p => ({
-                            id: p.playerId,
-                            name: `${p.firstName} ${p.lastName}`
-                        })).sort((a, b) => a.name.localeCompare(b.name));
-                        
-                        if (ALL_PLAYERS.length === 0) {
-                            throw new Error('Player list is empty. The tournament may not be live yet.');
-                        }
-
-                        populateDropdown(gamblerSelect, configData.gamblers, 'Select a Gambler');
-                        populateDropdown(golfer1Select, ALL_PLAYERS, 'Select Pick 1', true);
-                        populateDropdown(golfer2Select, ALL_PLAYERS, 'Select Pick 2', true);
-                        submitButton.disabled = false;
-
-                        golfer1Select.addEventListener('change', updateGolferDropdowns);
-                        golfer2Select.addEventListener('change', updateGolferDropdowns);
-                        form.addEventListener('submit', handleFormSubmit);
-
-                        renderBets();
-
-                    } catch (error) {
-                        console.error("Initialization of Gamblers Page failed:", error);
-                        setFormError(`Error initializing: ${error.message}`);
-                    }
-                };
-                
-                initializeGamblersPage();
-
-            })();
-        });
-    </script>
+    <!-- NEW: Script for the new Gamblers Golf page -->
+    <script src="gamblers.js" defer></script>
 </body>
 </html>
