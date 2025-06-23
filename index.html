@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- This corrected CSP allows scripts from gstatic.com, which is required for the real-time database -->
-    <meta http-equiv="Content-Security-Policy" content="script-src 'self' https://www.gstatic.com; connect-src 'self' https://live-golf-data.p.rapidapi.com wss://*.firebaseio.com;">
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' https://www.gstatic.com; connect-src 'self' https://live-golf-data.p.rapidapi.com wss://*.firebaseio.com;">
     <title>Discriminatory Gamblers - Golf Suite</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -146,5 +146,30 @@
     
     <script src="app.js"></script>
     <script src="gamblers.js" type="module"></script>
+
+    <!-- NEW: Dedicated Navigation Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const navContainer = document.getElementById('nav-container');
+            const pages = document.querySelectorAll('.page');
+
+            if (navContainer) {
+                navContainer.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('nav-button')) {
+                        const targetPageId = e.target.dataset.page;
+                        
+                        pages.forEach(p => {
+                            p.classList.toggle('hidden', p.id !== `page-${targetPageId}`);
+                        });
+                        
+                        navContainer.querySelectorAll('.nav-button').forEach(btn => {
+                            btn.classList.remove('active');
+                        });
+                        e.target.classList.add('active');
+                    }
+                });
+            }
+        });
+    </script>
 </body>
 </html>
