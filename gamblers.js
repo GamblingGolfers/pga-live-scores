@@ -64,22 +64,44 @@ document.addEventListener('DOMContentLoaded', () => {
         const getAuctionData = () => JSON.parse(localStorage.getItem(AUCTION_STORAGE_KEY) || '{}');
         const saveAuctionData = (data) => localStorage.setItem(AUCTION_STORAGE_KEY, JSON.stringify(data));
         
+        /**
+         * Renders the status of the auction for ONLY players with bids.
+         */
         const renderActiveAuctionStatus = () => {
             const auctionData = getAuctionData();
             auctionStatusContainer.innerHTML = '';
-            if (ALL_PLAYERS.length === 0) return;
+            
+            const playersWithBids = Object.keys(auctionData);
 
-            ALL_PLAYERS.forEach(player => {
-                const playerData = auctionData[player.id];
-                const bidCount = playerData ? playerData.bids.length : 0;
-                const highestBid = playerData ? Math.max(...playerData.bids.map(b => b.amount)) : 0;
+            if (playersWithBids.length === 0) {
+                auctionStatusContainer.innerHTML = `<p style="color: var(--text-muted-color);">No bids have been placed yet. Be the first!</p>`;
+                return;
+            }
+
+            // Sort players alphabetically by name before displaying
+            const sortedPlayerIds = playersWithBids.sort((a, b) => {
+                const playerA = ALL_PLAYERS.find(p => p.id === a);
+                const playerB = ALL_PLAYERS.find(p => p.id === b);
+                if (playerA && playerB) {
+                    return playerA.name.localeCompare(playerB.name);
+                }
+                return 0;
+            });
+
+            sortedPlayerIds.forEach(playerId => {
+                const player = ALL_PLAYERS.find(p => p.id === playerId);
+                if (!player) return; // Don't render if player isn't in master list
+
+                const playerData = auctionData[playerId];
+                const bidCount = playerData.bids.length;
+                const highestBid = Math.max(...playerData.bids.map(b => b.amount));
 
                 const card = document.createElement('div');
                 card.className = 'auction-card';
                 card.innerHTML = `
                     <div class="player-name">${player.name}</div>
                     <div class="bid-info">Bids Received: <strong>${bidCount}</strong></div>
-                    <div class="highest-bid">${highestBid > 0 ? `£${highestBid.toFixed(0)}` : 'No Bids Yet'}</div>
+                    <div class="highest-bid">£${highestBid.toFixed(0)}</div>
                 `;
                 auctionStatusContainer.appendChild(card);
             });
@@ -129,7 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             saveAuctionData(auctionData);
             renderActiveAuctionStatus();
-            form.reset(); // Resetting form also clears the gambler name, which is good.
+            form.reset(); 
 
             setTimeout(() => {
                 submitButton.disabled = false;
@@ -137,31 +159,43 @@ document.addEventListener('DOMContentLoaded', () => {
             }, 500);
         };
         
+        /**
+         * Renders the final results for ONLY players who received bids.
+         */
         const renderFinishedResults = () => {
             const auctionData = getAuctionData();
             auctionResultsContainer.innerHTML = '';
-            if (ALL_PLAYERS.length === 0) return;
+            const playersWithBids = Object.keys(auctionData);
 
-            ALL_PLAYERS.forEach(player => {
-                const playerData = auctionData[player.id];
-                let winnerCardHtml;
-
-                if (playerData && playerData.bids.length > 0) {
-                    const winningBid = playerData.bids.reduce((max, bid) => bid.amount > max.amount ? bid : max);
-                    winnerCardHtml = `
-                        <div class="bid-info">Winning Bid:</div>
-                        <div class="highest-bid">£${winningBid.amount.toFixed(0)}</div>
-                        <div class="winner-name">Won by: ${winningBid.gambler}</div>
-                    `;
-                } else {
-                    winnerCardHtml = `<div class="bid-info" style="text-align: center; width: 100%;">No bids were placed for this player.</div>`;
+            if (playersWithBids.length === 0) {
+                auctionResultsContainer.innerHTML = `<p style="color: var(--text-muted-color);">The auction finished with no bids placed.</p>`;
+                return;
+            }
+            
+            // Sort players alphabetically by name before displaying results
+            const sortedPlayerIds = playersWithBids.sort((a, b) => {
+                const playerA = ALL_PLAYERS.find(p => p.id === a);
+                const playerB = ALL_PLAYERS.find(p => p.id === b);
+                if (playerA && playerB) {
+                    return playerA.name.localeCompare(playerB.name);
                 }
+                return 0;
+            });
 
+            sortedPlayerIds.forEach(playerId => {
+                const player = ALL_PLAYERS.find(p => p.id === playerId);
+                if (!player) return; // Skip if player is no longer in the master list
+
+                const playerData = auctionData[playerId];
+                const winningBid = playerData.bids.reduce((max, bid) => bid.amount > max.amount ? bid : max);
+                
                 const card = document.createElement('div');
                 card.className = 'auction-card';
                 card.innerHTML = `
                     <div class="player-name">${player.name}</div>
-                    ${winnerCardHtml}
+                    <div class="bid-info">Winning Bid:</div>
+                    <div class="highest-bid">£${winningBid.amount.toFixed(0)}</div>
+                    <div class="winner-name">Won by: ${winningBid.gambler}</div>
                 `;
                 auctionResultsContainer.appendChild(card);
             });
