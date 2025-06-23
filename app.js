@@ -3,7 +3,7 @@
 // Import Firebase modules first
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, collection, doc, getDoc, setDoc, updateDoc, arrayUnion, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, arrayUnion, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 document.addEventListener('DOMContentLoaded', () => {
     
@@ -24,7 +24,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 pages.forEach(p => p.classList.toggle('hidden', p.id !== `page-${targetPageId}`));
                 navContainer.querySelectorAll('.nav-button').forEach(btn => btn.classList.remove('active'));
                 e.target.classList.add('active');
-                // Initialize auction only when the tab is clicked for the first time
                 if (targetPageId === 'gamblers' && !isAuctionInitialized) {
                     initializeAuctionFeature();
                 }
@@ -43,7 +42,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const MIN_BID_INCREMENT = 5;
         const ABSOLUTE_MIN_BID = 10;
         
-        // --- YOUR FIREBASE CREDENTIALS ---
         const firebaseConfig = {
           apiKey: "AIzaSyCxORo_xPNGACIRk5JryuXvxU4wSzwtdvE",
           authDomain: "gambling-golfers.firebaseapp.com",
@@ -70,7 +68,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const firebaseApp = initializeApp(firebaseConfig);
         const firebaseAuth = getAuth(firebaseApp);
         const db = getFirestore(firebaseApp);
-        const auctionCollectionRef = collection(db, `/artifacts/${appId}/public/data/auctionBids`);
+        const auctionBidsRef = collection(db, `/artifacts/${appId}/public/data/auctionBids`);
+        const auctionArchivesRef = collection(db, `/artifacts/${appId}/public/data/auctionArchives`);
 
         const setPageError = (message) => {
             const pageDiv = document.getElementById('page-gamblers');
@@ -131,7 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
             submitButton.textContent = 'Validating...';
 
             try {
-                const playerDocRef = doc(db, auctionCollectionRef.path, selectedPlayerId);
+                const playerDocRef = doc(db, auctionBidsRef.path, selectedPlayerId);
                 const playerDocSnap = await getDoc(playerDocRef);
                 const playerData = playerDocSnap.exists() ? playerDocSnap.data() : null;
                 const currentHighestBid = playerData ? Math.max(...playerData.bids.map(b => b.amount)) : 0;
@@ -183,6 +182,52 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
+        const resetAuction = async () => {
+            console.log("Resetting auction data...");
+            const querySnapshot = await getDocs(auctionBidsRef);
+            const deletePromises = [];
+            querySnapshot.forEach((doc) => {
+                deletePromises.push(deleteDoc(doc.ref));
+            });
+            await Promise.all(deletePromises);
+            console.log("Auction data reset successfully.");
+        };
+
+        const archiveAuction = async () => {
+             console.log("Archiving auction data...");
+             const bidsSnapshot = await getDocs(auctionBidsRef);
+             if (bidsSnapshot.empty) {
+                 console.log("No bids to archive.");
+                 return;
+             }
+             
+             const auctionData = {};
+             bidsSnapshot.forEach(doc => {
+                 auctionData[doc.id] = doc.data();
+             });
+             
+             const results = {};
+             for (const playerId in auctionData) {
+                 const playerData = auctionData[playerId];
+                 if (playerData.bids && playerData.bids.length > 0) {
+                     const winningBid = playerData.bids.reduce((max, bid) => bid.amount > max.amount ? bid : max);
+                     results[playerId] = {
+                         playerName: playerData.playerName,
+                         winningBid: winningBid.amount,
+                         winner: winningBid.gambler
+                     };
+                 }
+             }
+             
+             const archiveId = new Date().toISOString();
+             const archiveDocRef = doc(auctionArchivesRef, archiveId);
+             await setDoc(archiveDocRef, {
+                 results,
+                 archivedAt: new Date()
+             });
+             console.log(`Auction results archived successfully with ID: ${archiveId}`);
+        };
+
         (async function main() {
             try {
                 await signInAnonymously(firebaseAuth);
@@ -194,12 +239,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 const configResponse = await fetch('/config.json');
                 const configData = await configResponse.json();
-                const auctionStatus = configData.auctionStatus || 'not_started';
-                
-                onSnapshot(auctionCollectionRef, (snapshot) => {
+                const currentStatus = configData.auctionStatus || 'not_started';
+
+                // --- NEW: State Change Logic ---
+                const PREVIOUS_STATUS_KEY = 'dgg_last_auction_status';
+                const lastKnownStatus = localStorage.getItem(PREVIOUS_STATUS_KEY);
+
+                if (lastKnownStatus && lastKnownStatus !== currentStatus) {
+                    console.log(`Status changed from ${lastKnownStatus} to ${currentStatus}`);
+                    if (currentStatus === 'finished' && lastKnownStatus === 'active') {
+                        await archiveAuction();
+                    } else if (currentStatus === 'active' && lastKnownStatus === 'finished') {
+                        await resetAuction();
+                    }
+                }
+                localStorage.setItem(PREVIOUS_STATUS_KEY, currentStatus);
+                // --- END: State Change Logic ---
+
+                onSnapshot(auctionBidsRef, (snapshot) => {
                     const auctionData = {};
                     snapshot.forEach(doc => { auctionData[doc.id] = doc.data(); });
-                    setupPageByStatus(auctionStatus, auctionData);
+                    setupPageByStatus(currentStatus, auctionData);
                 });
 
             } catch (error) {
@@ -209,8 +269,8 @@ document.addEventListener('DOMContentLoaded', () => {
         })();
     };
 
-    // --- LEADERBOARD LOGIC ---
-    (function() {
+    // --- LEADERBOARD LOGIC (Original) ---
+    (() => {
         const leaderboardBody = document.getElementById('leaderboard-body');
         const gamblersContainer = document.getElementById('gamblers-container');
 
