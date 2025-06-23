@@ -1,14 +1,13 @@
 // FINAL VERSION - Uses the official player 'status' field for cut/wd logic.
+// NEW: Now shares fetched data globally to prevent multiple API calls.
 
 document.addEventListener('DOMContentLoaded', () => {
 
     // --- State & Configuration ---
-    let gamblerPicks = {}; 
+    let gamblerPicks = {};
     let availableGamblers = [];
     let tournamentConfig = {};
-    let allPlayersData = []; 
-
-    const url = '/.netlify/functions/get-scores'; 
+    let allPlayersData = [];
 
     const leaderboardBody = document.getElementById('leaderboard-body');
     const gamblersContainer = document.getElementById('gamblers-container');
@@ -38,10 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
         allPlayersData.forEach(player => {
             if (!player || !player.playerId) return;
 
-            // --- NEW: More robust "Missed Cut" logic ---
-            // A player is out if their status is 'cut' or 'wd' (withdrawn).
             const isOutOfTournament = player.status === 'cut' || player.status === 'wd';
-
             const parsedPlayerScore = parseScore(player.total);
             const parsedTodayScore = parseScore(player.currentRoundScore);
             const tagsForPlayer = gamblerPicks[player.playerId] || [];
@@ -57,10 +53,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         gambler.totalScore += parsedPlayerScore;
                         gambler.todayScore += parsedTodayScore;
                     }
-                    gambler.players.push({ 
-                        name: `${player.firstName.charAt(0)}. ${player.lastName}`, 
-                        score: parsedPlayerScore, 
-                        hasMissedCut: isOutOfTournament 
+                    gambler.players.push({
+                        name: `${player.firstName.charAt(0)}. ${player.lastName}`,
+                        score: parsedPlayerScore,
+                        hasMissedCut: isOutOfTournament
                     });
                 }
             });
@@ -103,8 +99,16 @@ document.addEventListener('DOMContentLoaded', () => {
             })
             .then(data => {
                 allPlayersData = data.leaderboardRows || [];
+
+                // --- NEW LINE ---
+                // Make the fetched data globally available for other scripts.
+                window.GOLF_DATA = { players: allPlayersData, config: tournamentConfig };
+                // Announce that the data is ready.
+                document.dispatchEvent(new CustomEvent('golfDataReady'));
+                // --- END NEW LINES ---
+
                 leaderboardBody.innerHTML = allPlayersData.map(player => {
-                    if (!player || !player.playerId) return ''; 
+                    if (!player || !player.playerId) return '';
                     const tagsHtml = (gamblerPicks[player.playerId] || []).map(tag => `<span class="tag">${tag}</span>`).join('');
                     const totalScoreInfo = formatScore(parseScore(player.total));
                     const todayScoreInfo = formatScore(parseScore(player.currentRoundScore));
@@ -117,7 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     return `<tr><td>${tagsHtml}</td><td>${player.position || 'N/A'}</td><td>${player.firstName || ''} ${player.lastName || ''}</td><td class="${totalScoreInfo.className}">${totalScoreInfo.text}</td><td class="${todayScoreInfo.className}">${todayScoreInfo.text}</td><td>${player.thru || 'N/A'}</td><td>${lastRound}</td></tr>`;
                 }).join('');
-                updateGamblersTable(); 
+                updateGamblersTable();
             })
             .catch(error => {
                 console.error("Error fetching or rendering data:", error);
@@ -138,7 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
             gamblerPicks = await picksResponse.json();
             availableGamblers = configData.gamblers;
             tournamentConfig = configData.tournament;
-            fetchLeaderboardData(); 
+            fetchLeaderboardData();
             setInterval(fetchLeaderboardData, 60000);
         } catch (error) {
             console.error("Initialization failed:", error);
