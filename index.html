@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- THIS IS THE CRITICAL FIX: The policy now includes 'script-src' to allow Firebase -->
+    <!-- This corrected CSP allows scripts from gstatic.com, which is required for the real-time database -->
     <meta http-equiv="Content-Security-Policy" content="script-src 'self' https://www.gstatic.com; connect-src 'self' https://live-golf-data.p.rapidapi.com wss://*.firebaseio.com;">
     <title>Discriminatory Gamblers - Golf Suite</title>
     
@@ -68,6 +68,7 @@
         #leaderboard-table tbody tr { transition: background-color 0.2s ease; }
         #leaderboard-table tbody tr:hover { background-color: var(--hover-color); }
         #leaderboard-table td:nth-child(2), #leaderboard-table td:nth-child(4), #leaderboard-table td:nth-child(5), #leaderboard-table td:nth-child(6), #leaderboard-table td:nth-child(7) { text-align: center; font-weight: 500; }
+        
         #auction-title-container { display: flex; align-items: center; gap: 20px; }
         #auction-status-indicator { font-size: 0.7em; font-weight: 700; padding: 4px 12px; border-radius: 999px; color: #fff; text-transform: uppercase; }
         #auction-page-layout { display: grid; grid-template-columns: 1fr; gap: 40px; }
@@ -145,6 +146,6 @@
     </div>
     
     <script src="app.js"></script>
-    <script src="gamblers.js" type="module"></script> <!-- NOTE: Added type="module" -->
+    <script src="gamblers.js" type="module"></script>
 </body>
 </html>
