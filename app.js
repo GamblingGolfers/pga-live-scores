@@ -1,3 +1,6 @@
+// --- THIS SCRIPT NOW CONTROLS THE ENTIRE APPLICATION ---
+
+// Import Firebase modules first
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, collection, doc, getDoc, setDoc, updateDoc, arrayUnion, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
@@ -145,14 +148,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- AUCTION LOGIC ---
     const initializeAuctionFeature = () => {
+        if (isAuctionInitialized) return;
         isAuctionInitialized = true;
+        
         const form = document.getElementById('auction-form');
         if (!form) return;
 
         const MIN_BID_INCREMENT = 5;
         const ABSOLUTE_MIN_BID = 10;
         
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "YOUR_API_KEY" };
+        // --- IMPORTANT ---
+        // REPLACE THIS with your actual Firebase project configuration
+        const firebaseConfig = {
+  apiKey: "AIzaSyCxORo_xPNGACIRk5JryuXvxU4wSzwtdvE",
+  authDomain: "gambling-golfers.firebaseapp.com",
+  projectId: "gambling-golfers",
+  storageBucket: "gambling-golfers.firebasestorage.app",
+  messagingSenderId: "76662537222",
+  appId: "1:76662537222:web:1e9edf0158827a49ab5787",
+  measurementId: "G-WMR6147S63"
+};
+        // Fallback for my dev environment
+        const finalConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : firebaseConfig;
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'dgg-auction-final';
 
         const activeView = document.getElementById('auction-active-view');
@@ -167,7 +184,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const auctionResultsContainer = document.getElementById('auction-results-container');
         const statusIndicator = document.getElementById('auction-status-indicator');
 
-        const firebaseApp = initializeApp(firebaseConfig);
+        const firebaseApp = initializeApp(finalConfig);
         const firebaseAuth = getAuth(firebaseApp);
         const db = getFirestore(firebaseApp);
         const auctionCollectionRef = collection(db, `/artifacts/${appId}/public/data/auctionBids`);
@@ -187,20 +204,16 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             select.disabled = false;
         };
-
-        const renderActiveAuctionStatus = (auctionData) => {
+        
+        const renderAuctionStatus = (auctionData) => {
             const playersWithBids = Object.keys(auctionData);
             auctionStatusContainer.innerHTML = playersWithBids.length === 0 
                 ? `<p style="color: var(--text-muted-color);">No bids placed yet. Be the first!</p>`
-                : playersWithBids.sort((a, b) => auctionData[a].playerName.localeCompare(auctionData[b].playerName)))
+                : playersWithBids.sort((a, b) => auctionData[a].playerName.localeCompare(auctionData[b].playerName))
                   .map(playerId => {
                     const playerData = auctionData[playerId];
                     const highestBid = Math.max(...playerData.bids.map(b => b.amount));
-                    return `<div class="auction-card">
-                                <div class="player-name">${playerData.playerName}</div>
-                                <div class="bid-info">Bids Received: <strong>${playerData.bids.length}</strong></div>
-                                <div class="highest-bid">£${highestBid.toFixed(0)}</div>
-                            </div>`;
+                    return `<div class="auction-card"><div class="player-name">${playerData.playerName}</div><div class="bid-info">Bids Received: <strong>${playerData.bids.length}</strong></div><div class="highest-bid">£${highestBid.toFixed(0)}</div></div>`;
                   }).join('');
         };
         
@@ -208,16 +221,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const playersWithBids = Object.keys(auctionData);
             auctionResultsContainer.innerHTML = playersWithBids.length === 0
                 ? `<p style="color: var(--text-muted-color);">The auction finished with no bids placed.</p>`
-                : playersWithBids.sort((a, b) => auctionData[a].playerName.localeCompare(auctionData[b].playerName)))
+                : playersWithBids.sort((a, b) => auctionData[a].playerName.localeCompare(auctionData[b].playerName))
                   .map(playerId => {
                     const playerData = auctionData[playerId];
                     const winningBid = playerData.bids.reduce((max, bid) => bid.amount > max.amount ? bid : max);
-                    return `<div class="auction-card">
-                                <div class="player-name">${playerData.playerName}</div>
-                                <div class="bid-info">Winning Bid:</div>
-                                <div class="highest-bid">£${winningBid.amount.toFixed(0)}</div>
-                                <div class="winner-name">Won by: ${winningBid.gambler}</div>
-                            </div>`;
+                    return `<div class="auction-card"><div class="player-name">${playerData.playerName}</div><div class="bid-info">Winning Bid:</div><div class="highest-bid">£${winningBid.amount.toFixed(0)}</div><div class="winner-name">Won by: ${winningBid.gambler}</div></div>`;
                   }).join('');
         };
         
@@ -296,9 +304,9 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
                 if (token) await signInWithCustomToken(firebaseAuth, token); else await signInAnonymously(firebaseAuth);
-
+                
                 if (allPlayersData.length === 0) {
-                    setPageError('Player data is not yet available. Please wait for the leaderboard to load.');
+                    setPageError('Player data is not yet available. Please refresh if the leaderboard has loaded.');
                     return;
                 }
                 
