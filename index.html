@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="script-src 'self' https://www.gstatic.com; connect-src 'self' https://live-golf-data.p.rapidapi.com wss://*.firebaseio.com;">
+    <!-- FINAL, ROBUST CSP: Allows all necessary Google/Firebase domains -->
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' https://www.gstatic.com; connect-src 'self' https://live-golf-data.p.rapidapi.com https://*.googleapis.com wss://*.firebaseio.com;">
     <title>Discriminatory Gamblers - Golf Suite</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -144,7 +145,6 @@
         </div>
     </div>
     
-    <!-- The single, unified script -->
     <script src="app.js" type="module"></script>
     
 </body>
