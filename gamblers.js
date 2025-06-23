@@ -1,7 +1,6 @@
-// This script now WAITS for app.js to fetch data, preventing API rate limit errors.
 document.addEventListener('DOMContentLoaded', () => {
 
-    // --- PAGE SWITCHING LOGIC ---
+    // Page switching logic remains the same
     const navContainer = document.getElementById('nav-container');
     const pages = document.querySelectorAll('.page');
     if (navContainer) {
@@ -15,158 +14,220 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- GAMBLERS GOLF PAGE LOGIC ---
+    // --- SILENT AUCTION LOGIC ---
     (function() {
-        const form = document.getElementById('bet-form');
-        if (!form) return; 
+        const form = document.getElementById('auction-form');
+        if (!form) return;
 
         let ALL_PLAYERS = [];
-        const BETS_STORAGE_KEY = 'dgg_live_bets_v2';
+        let GAMBLERS = [];
+        const AUCTION_STORAGE_KEY = 'dgg_silent_auction_data_v2';
+        const MIN_BID_INCREMENT = 5;
+        const ABSOLUTE_MIN_BID = 10;
 
-        const gamblerSelect = document.getElementById('gambler-name');
-        const golfer1Select = document.getElementById('golfer-1');
-        const value1Input = document.getElementById('value-1');
-        const golfer2Select = document.getElementById('golfer-2');
-        const value2Input = document.getElementById('value-2');
-        const errorMessageDiv = document.getElementById('error-message');
-        const betsContainer = document.getElementById('bets-container');
-        const submitButton = document.getElementById('submit-button');
+        // Views
+        const activeView = document.getElementById('auction-active-view');
+        const finishedView = document.getElementById('auction-finished-view');
+        const notStartedView = document.getElementById('auction-not-started-view');
 
-        const setFormError = (message) => {
-            const contentDiv = document.getElementById('page-gamblers-content');
-            if (contentDiv) {
-                contentDiv.innerHTML = `<p style="color: var(--danger-color); text-align: center; font-weight: 600;">${message}</p>`;
+        // Form elements
+        const gamblerSelect = document.getElementById('auction-gambler-select');
+        const playerSelect = document.getElementById('auction-player-select');
+        const bidAmountInput = document.getElementById('auction-bid-amount');
+        const errorMessageDiv = document.getElementById('auction-error-message');
+        const submitButton = document.getElementById('auction-submit-button');
+        
+        // Display containers
+        const auctionStatusContainer = document.getElementById('auction-status-container');
+        const auctionResultsContainer = document.getElementById('auction-results-container');
+        const mainTitle = document.getElementById('auction-main-title');
+
+
+        const setPageError = (message) => {
+            const pageDiv = document.getElementById('page-gamblers');
+            if (pageDiv) {
+                pageDiv.innerHTML = `<p style="color: var(--danger-color); text-align: center; font-weight: 600; padding: 40px;">${message}</p>`;
             }
         };
-        
-        const populateDropdown = (select, data, placeholder, isObject = false) => {
+
+        const populateDropdown = (select, data, placeholder) => {
             select.innerHTML = `<option value="">${placeholder}</option>`;
             data.forEach(item => {
                 const option = document.createElement('option');
-                if (isObject) { option.value = item.id; option.textContent = item.name; } 
-                else { option.value = item; option.textContent = item; }
+                option.value = typeof item === 'object' ? item.id : item;
+                option.textContent = typeof item === 'object' ? item.name : item;
                 select.appendChild(option);
             });
             select.disabled = false;
         };
+        
+        const getAuctionData = () => JSON.parse(localStorage.getItem(AUCTION_STORAGE_KEY) || '{}');
+        const saveAuctionData = (data) => localStorage.setItem(AUCTION_STORAGE_KEY, JSON.stringify(data));
+        
+        const renderActiveAuctionStatus = () => {
+            const auctionData = getAuctionData();
+            auctionStatusContainer.innerHTML = '';
+            if (ALL_PLAYERS.length === 0) return;
 
-        const updateGolferDropdowns = () => {
-            const val1 = golfer1Select.value;
-            const val2 = golfer2Select.value;
-            Array.from(golfer2Select.options).forEach(opt => opt.disabled = (opt.value && opt.value === val1));
-            Array.from(golfer1Select.options).forEach(opt => opt.disabled = (opt.value && opt.value === val2));
-        };
+            ALL_PLAYERS.forEach(player => {
+                const playerData = auctionData[player.id];
+                const bidCount = playerData ? playerData.bids.length : 0;
+                const highestBid = playerData ? Math.max(...playerData.bids.map(b => b.amount)) : 0;
 
-        const renderBets = () => {
-            const bets = JSON.parse(localStorage.getItem(BETS_STORAGE_KEY) || '[]');
-            betsContainer.innerHTML = '';
-            if (bets.length === 0) {
-                betsContainer.innerHTML = `<p style="color: var(--text-muted-color);">No bets submitted yet.</p>`;
-                return;
-            }
-            const sortedBets = bets.sort((a,b) => b.timestamp - a.timestamp);
-            sortedBets.forEach(bet => {
                 const card = document.createElement('div');
-                card.className = 'gambler-card';
+                card.className = 'auction-card';
                 card.innerHTML = `
-                    <div class="name" style="color: var(--accent-color);">${bet.gamblerName}</div>
-                    <div class="player-breakdown" style="margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 15px;">
-                        <div class="player-row"><span>Pick 1: ${bet.golfer1Name}</span><span class="player-score" style="color: var(--text-color);">£${parseFloat(bet.bet1).toFixed(2)}</span></div>
-                        <div class="player-row"><span>Pick 2: ${bet.golfer2Name}</span><span class="player-score" style="color: var(--text-color);">£${parseFloat(bet.bet2).toFixed(2)}</span></div>
-                    </div>
+                    <div class="player-name">${player.name}</div>
+                    <div class="bid-info">Bids Received: <strong>${bidCount}</strong></div>
+                    <div class="highest-bid">${highestBid > 0 ? `£${highestBid.toFixed(0)}` : 'No Bids Yet'}</div>
                 `;
-                betsContainer.appendChild(card);
+                auctionStatusContainer.appendChild(card);
             });
         };
-        
+
         const handleFormSubmit = (e) => {
             e.preventDefault();
             errorMessageDiv.textContent = '';
-            if (!gamblerSelect.value || !golfer1Select.value || !golfer2Select.value || !value1Input.value || !value2Input.value) {
-                errorMessageDiv.textContent = 'All fields are required.'; return;
+            
+            const selectedGambler = gamblerSelect.value;
+            const selectedPlayerId = playerSelect.value;
+            const bidAmount = parseFloat(bidAmountInput.value);
+
+            if (!selectedGambler || !selectedPlayerId || !bidAmountInput.value) {
+                errorMessageDiv.textContent = 'Please select your name, a player, and enter a bid.'; return;
             }
-            if (golfer1Select.value === golfer2Select.value) {
-                errorMessageDiv.textContent = 'You must select two different golfers.'; return;
+            if (isNaN(bidAmount)) {
+                errorMessageDiv.textContent = 'Please enter a valid number for the bid.'; return;
             }
-            if (parseFloat(value1Input.value) < 10 || parseFloat(value2Input.value) < 10) {
-                errorMessageDiv.textContent = 'Minimum bet is £10 for each pick.'; return;
+
+            const auctionData = getAuctionData();
+            const playerData = auctionData[selectedPlayerId];
+            const currentHighestBid = playerData ? Math.max(...playerData.bids.map(b => b.amount)) : 0;
+            
+            if (currentHighestBid === 0) {
+                if (bidAmount < ABSOLUTE_MIN_BID) {
+                    errorMessageDiv.textContent = `The first bid must be at least £${ABSOLUTE_MIN_BID}.`; return;
+                }
+            } else {
+                const requiredMinBid = currentHighestBid + MIN_BID_INCREMENT;
+                if (bidAmount < requiredMinBid) {
+                    errorMessageDiv.textContent = `Bid must be at least £${requiredMinBid}.`; return;
+                }
             }
 
             submitButton.disabled = true;
-            submitButton.textContent = 'Submitting...';
+            submitButton.textContent = 'Placing Bid...';
 
-            const currentBets = JSON.parse(localStorage.getItem(BETS_STORAGE_KEY) || '[]');
-            const newBet = {
-                gamblerName: gamblerSelect.value,
-                golfer1Name: golfer1Select.options[golfer1Select.selectedIndex].text,
-                bet1: parseFloat(value1Input.value),
-                golfer2Name: golfer2Select.options[golfer2Select.selectedIndex].text,
-                bet2: parseFloat(value2Input.value),
+            if (!auctionData[selectedPlayerId]) {
+                auctionData[selectedPlayerId] = { bids: [] };
+            }
+            auctionData[selectedPlayerId].bids.push({
+                amount: bidAmount,
+                gambler: selectedGambler,
                 timestamp: Date.now()
-            };
-            currentBets.push(newBet);
-            localStorage.setItem(BETS_STORAGE_KEY, JSON.stringify(currentBets));
+            });
 
-            renderBets();
-            form.reset();
-            updateGolferDropdowns();
-            
+            saveAuctionData(auctionData);
+            renderActiveAuctionStatus();
+            form.reset(); // Resetting form also clears the gambler name, which is good.
+
             setTimeout(() => {
                 submitButton.disabled = false;
-                submitButton.textContent = 'Submit Picks';
+                submitButton.textContent = 'Place Bid';
             }, 500);
         };
         
-        /**
-         * This function sets up the form using shared data.
-         */
-        const setupPageWithData = () => {
-            // Check if app.js has made the data available
+        const renderFinishedResults = () => {
+            const auctionData = getAuctionData();
+            auctionResultsContainer.innerHTML = '';
+            if (ALL_PLAYERS.length === 0) return;
+
+            ALL_PLAYERS.forEach(player => {
+                const playerData = auctionData[player.id];
+                let winnerCardHtml;
+
+                if (playerData && playerData.bids.length > 0) {
+                    const winningBid = playerData.bids.reduce((max, bid) => bid.amount > max.amount ? bid : max);
+                    winnerCardHtml = `
+                        <div class="bid-info">Winning Bid:</div>
+                        <div class="highest-bid">£${winningBid.amount.toFixed(0)}</div>
+                        <div class="winner-name">Won by: ${winningBid.gambler}</div>
+                    `;
+                } else {
+                    winnerCardHtml = `<div class="bid-info" style="text-align: center; width: 100%;">No bids were placed for this player.</div>`;
+                }
+
+                const card = document.createElement('div');
+                card.className = 'auction-card';
+                card.innerHTML = `
+                    <div class="player-name">${player.name}</div>
+                    ${winnerCardHtml}
+                `;
+                auctionResultsContainer.appendChild(card);
+            });
+        };
+
+        const setupPageByStatus = (status) => {
+            activeView.classList.add('hidden');
+            finishedView.classList.add('hidden');
+            notStartedView.classList.add('hidden');
+
+            switch (status) {
+                case 'active':
+                    mainTitle.textContent = 'Silent Auction';
+                    activeView.classList.remove('hidden');
+                    populateDropdown(gamblerSelect, GAMBLERS, 'Select Your Name');
+                    populateDropdown(playerSelect, ALL_PLAYERS, 'Select a Player');
+                    submitButton.disabled = false;
+                    form.addEventListener('submit', handleFormSubmit);
+                    renderActiveAuctionStatus();
+                    break;
+                case 'finished':
+                    mainTitle.textContent = 'Auction Results';
+                    finishedView.classList.remove('hidden');
+                    renderFinishedResults();
+                    break;
+                case 'not_started':
+                default:
+                    mainTitle.textContent = 'Auction Not Started';
+                    notStartedView.classList.remove('hidden');
+                    break;
+            }
+        };
+
+        const initializeAuctionPage = () => {
             if (!window.GOLF_DATA || !window.GOLF_DATA.players) {
-                setFormError("Waiting for live tournament data from the main page...");
+                setPageError("Waiting for live tournament data from the main page...");
                 return;
             }
-            
+
             ALL_PLAYERS = (window.GOLF_DATA.players || []).map(p => ({
                 id: p.playerId,
                 name: `${p.firstName} ${p.lastName}`
             })).sort((a, b) => a.name.localeCompare(b.name));
             
             if (ALL_PLAYERS.length === 0) {
-                 setFormError('Player list is empty. The tournament may not be live yet.');
+                 setPageError('Player list is empty. The tournament may not be live yet.');
                  return;
             }
 
-            // Also get gamblers from config.json data shared by app.js
             fetch('/config.json')
                 .then(res => res.json())
                 .then(configData => {
-                     populateDropdown(gamblerSelect, configData.gamblers, 'Select a Gambler');
+                     GAMBLERS = configData.gamblers || [];
+                     const status = configData.auctionStatus || 'not_started';
+                     setupPageByStatus(status);
                 })
                 .catch(err => {
-                    console.error("Could not load config.json for gamblers page", err);
-                    setFormError("Could not load gambler list from '/config.json'.");
+                    console.error("Could not load config.json", err);
+                    setPageError("Could not load configuration file.");
                 });
-
-
-            populateDropdown(golfer1Select, ALL_PLAYERS, 'Select Pick 1', true);
-            populateDropdown(golfer2Select, ALL_PLAYERS, 'Select Pick 2', true);
-            submitButton.disabled = false;
-
-            golfer1Select.addEventListener('change', updateGolferDropdowns);
-            golfer2Select.addEventListener('change', updateGolferDropdowns);
-            form.addEventListener('submit', handleFormSubmit);
-
-            renderBets();
         };
 
         // --- Initialization ---
-        // Listen for the custom event dispatched by app.js
-        document.addEventListener('golfDataReady', setupPageWithData);
-
-        // Also, check if data is ALREADY available (if app.js loaded and fetched data first)
-        if(window.GOLF_DATA) {
-            setupPageWithData();
+        document.addEventListener('golfDataReady', initializeAuctionPage);
+        if (window.GOLF_DATA) {
+            initializeAuctionPage();
         }
 
     })();
