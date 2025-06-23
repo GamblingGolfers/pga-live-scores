@@ -63,23 +63,25 @@ document.addEventListener('DOMContentLoaded', () => {
             return gamblerA.totalScore - gamblerB.totalScore;
         });
         
-        gamblersContainer.innerHTML = '';
-        sortedGamblers.forEach(([gamblerName, gamblerInfo]) => {
-            const card = document.createElement('div');
-            card.className = 'gambler-card';
-            let finalScore = gamblerInfo.hasMissedCutPlayer ? { text: formatScore(gamblerInfo.totalScore).text, className: 'score-over' } : formatScore(gamblerInfo.totalScore);
-            const todayScoreInfo = formatScore(gamblerInfo.todayScore);
-            const madeCutCount = gamblerInfo.totalPicks - gamblerInfo.missedCutCount;
-            const teamStatusText = `${madeCutCount}/${gamblerInfo.totalPicks} MADE CUT`;
-            const playerBreakdownHtml = gamblerInfo.players.map(p => {
-                const playerScore = formatScore(p.score);
-                const missedCutClass = p.hasMissedCut ? 'missed-cut' : '';
-                const missedCutMarker = p.hasMissedCut ? ' (MC)' : '';
-                return `<div class="player-row ${missedCutClass}"><span class="player-name">${p.name}</span><span class="player-score ${playerScore.className}">${playerScore.text}${missedCutMarker}</span></div>`;
-            }).join('');
-            card.innerHTML = `<div class="name">${gamblerName}</div><div class="total-score ${finalScore.className}">${finalScore.text}</div><div class="today-score ${todayScoreInfo.className}">Today: ${todayScoreInfo.text}</div><div class="team-status">${teamStatusText}</div><div class="player-breakdown">${playerBreakdownHtml}</div>`;
-            gamblersContainer.appendChild(card);
-        });
+        if (gamblersContainer) {
+            gamblersContainer.innerHTML = '';
+            sortedGamblers.forEach(([gamblerName, gamblerInfo]) => {
+                const card = document.createElement('div');
+                card.className = 'gambler-card';
+                let finalScore = gamblerInfo.hasMissedCutPlayer ? { text: formatScore(gamblerInfo.totalScore).text, className: 'score-over' } : formatScore(gamblerInfo.totalScore);
+                const todayScoreInfo = formatScore(gamblerInfo.todayScore);
+                const madeCutCount = gamblerInfo.totalPicks - gamblerInfo.missedCutCount;
+                const teamStatusText = `${madeCutCount}/${gamblerInfo.totalPicks} MADE CUT`;
+                const playerBreakdownHtml = gamblerInfo.players.map(p => {
+                    const playerScore = formatScore(p.score);
+                    const missedCutClass = p.hasMissedCut ? 'missed-cut' : '';
+                    const missedCutMarker = p.hasMissedCut ? ' (MC)' : '';
+                    return `<div class="player-row ${missedCutClass}"><span class="player-name">${p.name}</span><span class="player-score ${playerScore.className}">${playerScore.text}${missedCutMarker}</span></div>`;
+                }).join('');
+                card.innerHTML = `<div class="name">${gamblerName}</div><div class="total-score ${finalScore.className}">${finalScore.text}</div><div class="today-score ${todayScoreInfo.className}">Today: ${todayScoreInfo.text}</div><div class="team-status">${teamStatusText}</div><div class="player-breakdown">${playerBreakdownHtml}</div>`;
+                gamblersContainer.appendChild(card);
+            });
+        }
     };
     
     const fetchLeaderboardData = () => {
@@ -94,29 +96,27 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(data => {
                 allPlayersData = data.leaderboardRows || [];
 
-                // --- THIS IS THE CRUCIAL CHANGE ---
-                // After successfully getting the data, make it available to other scripts
-                // and then call the function to initialize the auction page.
+                // Make the data available globally for other scripts
                 window.GOLF_DATA = { players: allPlayersData };
-                if (window.initializeAuctionFeature) {
-                    window.initializeAuctionFeature();
-                }
-                // --- END CHANGE ---
+                // Announce that the data is ready by firing a custom event
+                document.dispatchEvent(new CustomEvent('golfDataReady'));
 
-                leaderboardBody.innerHTML = allPlayersData.map(player => {
-                    if (!player || !player.playerId) return '';
-                    const tagsHtml = (gamblerPicks[player.playerId] || []).map(tag => `<span class="tag">${tag}</span>`).join('');
-                    const totalScoreInfo = formatScore(parseScore(player.total));
-                    const todayScoreInfo = formatScore(parseScore(player.currentRoundScore));
-                    let lastRound = 'N/A';
-                    if (player.rounds && player.rounds.length > 0) {
-                        const lastRoundData = player.rounds[player.rounds.length - 1];
-                        if (lastRoundData && lastRoundData.strokes && lastRoundData.strokes['$numberInt']) {
-                            lastRound = lastRoundData.strokes['$numberInt'];
+                if (leaderboardBody) {
+                    leaderboardBody.innerHTML = allPlayersData.map(player => {
+                        if (!player || !player.playerId) return '';
+                        const tagsHtml = (gamblerPicks[player.playerId] || []).map(tag => `<span class="tag">${tag}</span>`).join('');
+                        const totalScoreInfo = formatScore(parseScore(player.total));
+                        const todayScoreInfo = formatScore(parseScore(player.currentRoundScore));
+                        let lastRound = 'N/A';
+                        if (player.rounds && player.rounds.length > 0) {
+                            const lastRoundData = player.rounds[player.rounds.length - 1];
+                            if (lastRoundData && lastRoundData.strokes && lastRoundData.strokes['$numberInt']) {
+                                lastRound = lastRoundData.strokes['$numberInt'];
+                            }
                         }
-                    }
-                    return `<tr><td>${tagsHtml}</td><td>${player.position || 'N/A'}</td><td>${player.firstName || ''} ${player.lastName || ''}</td><td class="${totalScoreInfo.className}">${totalScoreInfo.text}</td><td class="${todayScoreInfo.className}">${todayScoreInfo.text}</td><td>${player.thru || 'N/A'}</td><td>${lastRound}</td></tr>`;
-                }).join('');
+                        return `<tr><td>${tagsHtml}</td><td>${player.position || 'N/A'}</td><td>${player.firstName || ''} ${player.lastName || ''}</td><td class="${totalScoreInfo.className}">${totalScoreInfo.text}</td><td class="${todayScoreInfo.className}">${todayScoreInfo.text}</td><td>${player.thru || 'N/A'}</td><td>${lastRound}</td></tr>`;
+                    }).join('');
+                }
                 updateGamblersTable();
             })
             .catch(error => {
