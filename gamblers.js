@@ -203,5 +203,6 @@ window.initializeAuctionFeature = () => {
         }
     };
     
-    main();
-};
+    // This is the trigger. app.js calls this function when it's ready.
+    window.initializeAuctionFeature = main;
+});
