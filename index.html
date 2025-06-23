@@ -22,6 +22,9 @@
             --score-red: #dc3545;
             --hover-color: rgba(255, 255, 255, 0.05);
             --danger-color: #dc3545;
+            --status-orange: #f97316;
+            --status-green: #22c55e;
+            --status-red: #ef4444;
         }
         * { box-sizing: border-box; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -66,10 +69,10 @@
         #leaderboard-table td:nth-child(2), #leaderboard-table td:nth-child(4), #leaderboard-table td:nth-child(5), #leaderboard-table td:nth-child(6), #leaderboard-table td:nth-child(7) { text-align: center; font-weight: 500; }
         
         /* Styles for Silent Auction Page */
+        #auction-title-container { display: flex; align-items: center; gap: 20px; }
+        #auction-status-indicator { font-size: 0.7em; font-weight: 700; padding: 4px 12px; border-radius: 999px; color: #fff; text-transform: uppercase; }
         #auction-page-layout { display: grid; grid-template-columns: 1fr; gap: 40px; }
-        @media (min-width: 900px) {
-            #auction-page-layout { grid-template-columns: 350px 1fr; }
-        }
+        @media (min-width: 900px) { #auction-page-layout { grid-template-columns: 350px 1fr; } }
         #auction-form-container { background: var(--card-color); backdrop-filter: blur(10px); padding: 30px; border-radius: 12px; border: 1px solid var(--border-color); }
         #auction-form label { display: block; font-weight: 600; margin-bottom: 8px; font-size: 0.9em; }
         #auction-form input, #auction-form select { width: 100%; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; color: var(--text-color); font-family: 'Inter', sans-serif; font-size: 1em; margin-top: 5px; }
@@ -96,7 +99,6 @@
             </div>
         </header>
 
-        <!-- Page 1: Original Leaderboard Content -->
         <div id="page-leaderboard" class="page">
             <h1 style="display: none;">Discriminatory Gamblers - Golf Tracker</h1>
             <h2>Gamblers' Scores</h2>
@@ -104,53 +106,40 @@
             <h2>US OPEN 2025 - Leaderboard</h2>
             <table id="leaderboard-table">
                 <thead>
-                    <tr>
-                        <th style="width: 20%;">Gambler</th><th style="width: 10%;">Pos</th><th>Player</th><th style="width: 10%;">Total</th><th style="width: 10%;">Today</th><th style="width: 10%;">Thru</th><th style="width: 10%;">Round</th>
-                    </tr>
+                    <tr><th style="width: 20%;">Gambler</th><th style="width: 10%;">Pos</th><th>Player</th><th style="width: 10%;">Total</th><th style="width: 10%;">Today</th><th style="width: 10%;">Thru</th><th style="width: 10%;">Round</th></tr>
                 </thead>
                 <tbody id="leaderboard-body"></tbody>
             </table>
         </div>
 
-        <!-- Page 2: New Silent Auction Content -->
         <div id="page-gamblers" class="page hidden">
-            <h1 id="auction-main-title" style="font-size: 2em; margin-bottom: 20px;">Silent Auction</h1>
-            
-            <div id="auction-active-view">
+            <div id="auction-title-container">
+                 <h1 id="auction-main-title" style="font-size: 2em; margin-bottom: 20px; text-align: left;">Silent Auction</h1>
+                 <span id="auction-status-indicator"></span>
+            </div>
+
+            <div id="auction-active-view" class="hidden">
                 <div id="auction-page-layout">
                     <div id="auction-form-container">
                          <h2 style="margin-top: 0; border: none;">Place a Bid</h2>
                          <form id="auction-form">
-                            <div style="margin-bottom: 20px;">
-                                <label for="auction-gambler-select">Your Name</label>
-                                <select id="auction-gambler-select" disabled><option>Loading...</option></select>
-                            </div>
-                            <div style="margin-bottom: 20px;">
-                                <label for="auction-player-select">Player</label>
-                                <select id="auction-player-select" disabled><option>Loading...</option></select>
-                            </div>
-                            <div>
-                                 <label for="auction-bid-amount">Your Bid Amount (£)</label>
-                                <input type="number" id="auction-bid-amount" min="10" placeholder="e.g., 55">
-                            </div>
+                            <div style="margin-bottom: 20px;"><label for="auction-gambler-select">Your Name</label><select id="auction-gambler-select" disabled><option>Loading...</option></select></div>
+                            <div style="margin-bottom: 20px;"><label for="auction-player-select">Player</label><select id="auction-player-select" disabled><option>Loading...</option></select></div>
+                            <div><label for="auction-bid-amount">Your Bid Amount (£)</label><input type="number" id="auction-bid-amount" min="10" placeholder="e.g., 55"></div>
                             <div id="auction-error-message" style="color: var(--danger-color); margin-top: 15px; text-align: center; font-weight: 600; min-height: 20px;"></div>
                             <button type="submit" id="auction-submit-button" disabled>Place Bid</button>
                         </form>
                     </div>
                     <div>
                         <h2 style="margin-top: 0; border: none;">Live Auction Status</h2>
-                        <div id="auction-status-container">
-                            <p style="color: var(--text-muted-color);">Loading auction status...</p>
-                        </div>
+                        <div id="auction-status-container"><p style="color: var(--text-muted-color);">Loading auction status...</p></div>
                     </div>
                 </div>
             </div>
 
             <div id="auction-finished-view" class="hidden">
                  <h2 style="margin-top: 0; border: none;">Final Results</h2>
-                 <div id="auction-results-container">
-                     <p style="color: var(--text-muted-color);">Calculating results...</p>
-                 </div>
+                 <div id="auction-results-container"><p style="color: var(--text-muted-color);">Calculating results...</p></div>
             </div>
              <div id="auction-not-started-view" class="hidden" style="text-align: center; padding: 40px; background: var(--card-color); border-radius: 12px;">
                  <p>The auction has not started yet. Please check back later.</p>
