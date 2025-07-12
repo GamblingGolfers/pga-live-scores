@@ -130,7 +130,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         };
         
-        // --- NEW: Updated function to check bid limit ---
         const handleFormSubmit = async (e) => {
             e.preventDefault();
             errorMessageDiv.textContent = '';
@@ -150,15 +149,11 @@ document.addEventListener('DOMContentLoaded', () => {
             submitButton.textContent = 'Validating...';
 
             try {
-                // Check the number of bids the gambler has already made
                 const allBidsSnapshot = await getDocs(auctionBidsRef);
                 let gamblerBidCount = 0;
                 allBidsSnapshot.forEach(doc => {
-                    const playerData = doc.data();
-                    playerData.bids.forEach(bid => {
-                        if (bid.gambler === selectedGambler) {
-                            gamblerBidCount++;
-                        }
+                    doc.data().bids.forEach(bid => {
+                        if (bid.gambler === selectedGambler) gamblerBidCount++;
                     });
                 });
 
@@ -166,7 +161,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     throw new Error("You have already placed your maximum of 2 bids.");
                 }
 
-                // If check passes, proceed with placing the bid
                 submitButton.textContent = 'Placing Bid...';
                 const playerDocRef = doc(db, auctionBidsRef.path, selectedPlayerId);
                 const playerDocSnap = await getDoc(playerDocRef);
@@ -401,19 +395,44 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
-        const fetchLeaderboardData = () => {
+        const fetchLeaderboardData = async () => {
             const { orgId, tournId, year } = tournamentConfig;
             const url = `/.netlify/functions/get-scores?orgId=${orgId}&tournId=${tournId}&year=${year}`;
-            fetch(url)
-                .then(res => res.ok ? res.json() : Promise.reject(res))
-                .then(data => {
-                    allPlayersData = data.leaderboardRows || [];
-                    updateUI();
-                })
-                .catch(err => {
-                    console.error("Error fetching data:", err);
-                    if (gamblersContainer) gamblersContainer.innerHTML = `<p style="color: #d9534f; font-weight: bold;">Could not load live data.</p>`;
-                });
+            
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`Live API failed with status: ${response.status}`);
+                const data = await response.json();
+                if (!data.leaderboardRows || data.leaderboardRows.length === 0) {
+                    throw new Error("Live API returned no players.");
+                }
+                console.log("Successfully fetched live player data from API.");
+                allPlayersData = data.leaderboardRows;
+            } catch (error) {
+                console.warn(error.message, "Attempting to use fallback player list.");
+                try {
+                    const response = await fetch('/provisional_players.json');
+                    if (!response.ok) throw new Error("Could not load provisional_players.json");
+                    const provisionalData = await response.json();
+                    console.log("Successfully loaded provisional player data.");
+                    // Map provisional data to the structure the app expects
+                    allPlayersData = provisionalData.map((player, index) => ({
+                        playerId: `${player.lastName.toLowerCase()}_${player.firstName.toLowerCase()}_${index}`,
+                        firstName: player.firstName,
+                        lastName: player.lastName,
+                        status: 'active', // Assume active for auction
+                        total: 'E',
+                        currentRoundScore: 'E',
+                        thru: '-',
+                        rounds: []
+                    }));
+                } catch (fallbackError) {
+                    console.error("Fallback failed:", fallbackError);
+                    if (gamblersContainer) gamblersContainer.innerHTML = `<p style="color: #d9534f; font-weight: bold;">Could not load live or provisional player data.</p>`;
+                    return; // Stop execution if no player data is available
+                }
+            }
+            updateUI();
         };
 
         (async function main() {
@@ -424,7 +443,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 gamblerPicks = await picksResponse.json();
                 availableGamblers = configData.gamblers;
                 tournamentConfig = configData.tournament;
-                fetchLeaderboardData();
+                await fetchLeaderboardData(); // Use await to ensure this finishes before setting interval
                 setInterval(fetchLeaderboardData, 60000);
             } catch (error) {
                 console.error("Initialization failed:", error);
