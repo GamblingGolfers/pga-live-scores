@@ -38,6 +38,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const form = document.getElementById('auction-form');
         if (!form) return;
+
+        const MIN_BID_INCREMENT = 5;
+        const ABSOLUTE_MIN_BID = 10;
         
         const firebaseConfig = {
           apiKey: "AIzaSyCxORo_xPNGACIRk5JryuXvxU4wSzwtdvE",
@@ -192,7 +195,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 auctionFormContainer.style.maxWidth = '';
                 auctionFormContainer.style.margin = '';
             }
-            if(auctionStatusWrapper) auctionStatusWrapper.classList.remove('hidden');
+            if(auctionStatusWrapper) auctionStatusWrapper.style.display = '';
 
             if (statusIndicator) {
                  switch (status) {
@@ -200,7 +203,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         statusIndicator.textContent = 'Active'; 
                         statusIndicator.style.backgroundColor = 'var(--status-green)'; 
                         activeView.classList.remove('hidden'); 
-                        if (auctionStatusWrapper) auctionStatusWrapper.classList.add('hidden');
+                        if (auctionStatusWrapper) auctionStatusWrapper.style.display = 'none';
                         if (auctionPageLayout) auctionPageLayout.style.gridTemplateColumns = '1fr';
                         if (auctionFormContainer) {
                             auctionFormContainer.style.maxWidth = '450px';
@@ -277,14 +280,9 @@ document.addEventListener('DOMContentLoaded', () => {
              console.log(`Auction results archived successfully with ID: ${archiveId}`);
         };
 
-        (async function main() {
+        const main = async () => {
             try {
                 await signInAnonymously(firebaseAuth);
-                
-                if (allPlayersData.length === 0) {
-                    setPageError('Player data is not yet available. Please refresh if the leaderboard has loaded.');
-                    return;
-                }
                 
                 const configResponse = await fetch('/config.json');
                 const configData = await configResponse.json();
@@ -313,10 +311,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error("Auction Initialization failed:", error);
                 setPageError(`Auction Initialization failed: ${error.message}`);
             }
-        })();
+        };
+        
+        // This is the robust check. It waits for the data before running main().
+        let attempts = 0;
+        const dataCheckInterval = setInterval(() => {
+            if (allPlayersData.length > 0) {
+                clearInterval(dataCheckInterval);
+                main();
+            } else {
+                attempts++;
+                if (attempts > 40) { // Timeout after 10 seconds
+                    clearInterval(dataCheckInterval);
+                    setPageError("Error: Timed out waiting for player data. Please refresh.");
+                }
+            }
+        }, 250);
     };
 
-    // --- LEADERBOARD LOGIC (Original) ---
+    // --- LEADERBOARD LOGIC (Original, but now triggers auction init) ---
     (() => {
         const leaderboardBody = document.getElementById('leaderboard-body');
         const gamblersContainer = document.getElementById('gamblers-container');
@@ -415,12 +428,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (!response.ok) throw new Error("Could not load provisional_players.json");
                     const provisionalData = await response.json();
                     console.log("Successfully loaded provisional player data.");
-                    // Map provisional data to the structure the app expects
                     allPlayersData = provisionalData.map((player, index) => ({
                         playerId: `${player.lastName.toLowerCase()}_${player.firstName.toLowerCase()}_${index}`,
                         firstName: player.firstName,
                         lastName: player.lastName,
-                        status: 'active', // Assume active for auction
+                        status: 'active',
                         total: 'E',
                         currentRoundScore: 'E',
                         thru: '-',
@@ -429,7 +441,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 } catch (fallbackError) {
                     console.error("Fallback failed:", fallbackError);
                     if (gamblersContainer) gamblersContainer.innerHTML = `<p style="color: #d9534f; font-weight: bold;">Could not load live or provisional player data.</p>`;
-                    return; // Stop execution if no player data is available
+                    return;
                 }
             }
             updateUI();
@@ -443,7 +455,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 gamblerPicks = await picksResponse.json();
                 availableGamblers = configData.gamblers;
                 tournamentConfig = configData.tournament;
-                await fetchLeaderboardData(); // Use await to ensure this finishes before setting interval
+                await fetchLeaderboardData(); 
                 setInterval(fetchLeaderboardData, 60000);
             } catch (error) {
                 console.error("Initialization failed:", error);
