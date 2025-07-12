@@ -1,151 +1,459 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="script-src 'self' https://www.gstatic.com; connect-src 'self' https://live-golf-data.p.rapidapi.com wss://*.firebaseio.com;">
-    <title>Discriminatory Gamblers - Golf Suite</title>
-    
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+// --- THIS SCRIPT NOW CONTROLS THE ENTIRE APPLICATION ---
 
-    <style>
-        :root {
-            --bg-color: #121212;
-            --card-color: rgba(38, 38, 38, 0.7);
-            --text-color: #e0e0e0;
-            --text-muted-color: #a0a0a0;
-            --border-color: rgba(255, 255, 255, 0.1);
-            --accent-color: #00aaff;
-            --score-green: #28a745;
-            --score-red: #dc3545;
-            --hover-color: rgba(255, 255, 255, 0.05);
-            --danger-color: #dc3545;
-            --status-orange: #f97316;
-            --status-green: #22c55e;
-            --status-red: #ef4444;
-        }
-        * { box-sizing: border-box; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            margin: 0;
-            padding: 20px;
-        }
-        .container { max-width: 950px; margin: auto; animation: fadeIn 0.5s ease-out; }
-        h1, h2 { color: #fff; padding-bottom: 10px; margin-top: 0; font-weight: 700; }
-        h2 { margin-top: 40px; border-bottom: 1px solid var(--border-color); font-weight: 600; }
-        h1 { font-size: 2.5em; text-align: center; margin-bottom: 40px; }
-        .app-header { display: flex; justify-content: space-between; align-items: center; padding: 0 0 20px 0; margin-bottom: 20px; }
-        .app-header h1 { font-size: 1.8em; margin: 0; padding: 0; text-align: left; }
-        .nav-buttons { display: flex; gap: 10px; background: var(--card-color); padding: 8px; border-radius: 10px; border: 1px solid var(--border-color); }
-        .nav-button { background: transparent; border: none; color: var(--text-muted-color); font-family: 'Inter', sans-serif; font-weight: 600; font-size: 0.9em; padding: 8px 16px; border-radius: 8px; cursor: pointer; transition: all 0.2s ease; }
-        .nav-button.active { background-color: var(--accent-color); color: #fff; box-shadow: 0 0 15px rgba(0, 170, 255, 0.4); }
-        .nav-button:not(.active):hover { background-color: var(--hover-color); color: var(--text-color); }
-        .page.hidden { display: none; }
-        #gamblers-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px; }
-        .gambler-card { background: var(--card-color); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); text-align: center; transition: all 0.3s ease; }
-        .gambler-card:hover { transform: translateY(-5px); box-shadow: 0 8px 25px rgba(0,0,0,0.2); }
-        .gambler-card .name { font-weight: 600; font-size: 1.2em; color: var(--text-color); }
-        .gambler-card .total-score { font-weight: 700; font-size: 3em; margin: 8px 0 5px 0; }
-        .gambler-card .today-score { font-size: 1.1em; font-weight: 600; }
-        .gambler-card .team-status { font-size: 0.8em; font-weight: 500; color: var(--text-muted-color); text-transform: uppercase; margin-top: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color); }
-        .gambler-card .player-breakdown { font-size: 0.9em; text-align: left; margin-top: 12px; color: var(--text-muted-color); }
-        .player-row { display: flex; justify-content: space-between; padding: 5px 0; }
-        .player-row .player-score { font-weight: 600; }
-        .player-row.missed-cut { text-decoration: line-through; opacity: 0.6; }
-        .score-under { color: var(--score-green); }
-        .score-over { color: var(--score-red); }
-        .score-even { color: var(--text-color); }
-        .tag { display: inline-block; background-color: var(--accent-color); color: #fff; padding: 4px 10px; border-radius: 12px; font-size: 0.8em; font-weight: 500; margin-right: 5px; margin-bottom: 3px; }
-        #leaderboard-table { width: 100%; border-collapse: separate; border-spacing: 0; }
-        #leaderboard-table thead th { position: sticky; top: 0; background-color: #2a2a2a; font-weight: 600; color: var(--text-muted-color); z-index: 10; }
-        #leaderboard-table th, #leaderboard-table td { padding: 14px 15px; text-align: left; border-bottom: 1px solid var(--border-color); }
-        #leaderboard-table tbody tr { transition: background-color 0.2s ease; }
-        #leaderboard-table tbody tr:hover { background-color: var(--hover-color); }
-        #leaderboard-table td:nth-child(2), #leaderboard-table td:nth-child(4), #leaderboard-table td:nth-child(5), #leaderboard-table td:nth-child(6), #leaderboard-table td:nth-child(7) { text-align: center; font-weight: 500; }
+// Import Firebase modules first
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { getFirestore, collection, doc, getDoc, setDoc, updateDoc, arrayUnion, onSnapshot, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+document.addEventListener('DOMContentLoaded', () => {
+    
+    // --- SHARED STATE & CONFIG ---
+    let gamblerPicks = {};
+    let availableGamblers = [];
+    let tournamentConfig = {};
+    let allPlayersData = [];
+    let isAuctionInitialized = false;
+
+    // --- NAVIGATION ---
+    const navContainer = document.getElementById('nav-container');
+    const pages = document.querySelectorAll('.page');
+    if (navContainer) {
+        navContainer.addEventListener('click', (e) => {
+            if (e.target.classList.contains('nav-button')) {
+                const targetPageId = e.target.dataset.page;
+                pages.forEach(p => p.classList.toggle('hidden', p.id !== `page-${targetPageId}`));
+                navContainer.querySelectorAll('.nav-button').forEach(btn => btn.classList.remove('active'));
+                e.target.classList.add('active');
+                // Initialize auction only when the tab is clicked for the first time
+                if (targetPageId === 'gamblers' && !isAuctionInitialized) {
+                    initializeAuctionFeature();
+                }
+            }
+        });
+    }
+
+    // --- AUCTION LOGIC ---
+    const initializeAuctionFeature = () => {
+        if (isAuctionInitialized) return;
+        isAuctionInitialized = true;
         
-        #auction-title-container { display: flex; align-items: center; gap: 20px; }
-        #auction-status-indicator { font-size: 0.7em; font-weight: 700; padding: 4px 12px; border-radius: 999px; color: #fff; text-transform: uppercase; }
-        #auction-page-layout { display: grid; grid-template-columns: 1fr; gap: 40px; }
-        @media (min-width: 900px) { #auction-page-layout { grid-template-columns: 350px 1fr; } }
-        #auction-form-container { background: var(--card-color); backdrop-filter: blur(10px); padding: 30px; border-radius: 12px; border: 1px solid var(--border-color); }
-        #auction-form label { display: block; font-weight: 600; margin-bottom: 8px; font-size: 0.9em; }
-        #auction-form input, #auction-form select { width: 100%; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; color: var(--text-color); font-family: 'Inter', sans-serif; font-size: 1em; margin-top: 5px; }
-        #auction-form select option { background: var(--bg-color); color: var(--text-color); }
-        #auction-form button { width: 100%; background: var(--accent-color); border: none; padding: 15px; border-radius: 8px; color: #fff; font-weight: 700; font-size: 1.1em; cursor: pointer; transition: all 0.3s ease; margin-top: 20px; }
-        #auction-form button:hover { box-shadow: 0 0 20px rgba(0, 170, 255, 0.5); transform: translateY(-2px); }
-        #auction-form button:disabled { background: #555; color: #999; cursor: not-allowed; }
-        #auction-status-container, #auction-results-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
-        .auction-card { background: var(--card-color); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); }
-        .auction-card .player-name { font-weight: 700; font-size: 1.1em; color: var(--accent-color); }
-        .auction-card .bid-info { margin-top: 15px; font-size: 0.9em; }
-        .auction-card .highest-bid { font-weight: 700; font-size: 1.5em; color: var(--text-color); margin-top: 5px; }
-        .auction-card .winner-name { font-weight: 600; font-size: 1em; color: var(--score-green); }
-    </style>
-</head>
-<body>
+        const form = document.getElementById('auction-form');
+        if (!form) return;
 
-    <div class="container">
-        <header class="app-header">
-            <h1>Golf Suite</h1>
-            <div id="nav-container" class="nav-buttons">
-                <button data-page="leaderboard" class="nav-button active">Leaderboard</button>
-                <button data-page="gamblers" class="nav-button">DG Auction</button>
-            </div>
-        </header>
+        const MIN_BID_INCREMENT = 5;
+        const ABSOLUTE_MIN_BID = 10;
+        
+        const firebaseConfig = {
+          apiKey: "AIzaSyCxORo_xPNGACIRk5JryuXvxU4wSzwtdvE",
+          authDomain: "gambling-golfers.firebaseapp.com",
+          projectId: "gambling-golfers",
+          storageBucket: "gambling-golfers.appspot.com",
+          messagingSenderId: "76662537222",
+          appId: "1:76662537222:web:1e9edf0158827a49ab5787",
+          measurementId: "G-WMR6147S63"
+        };
+        const appId = 'dgg-auction-final';
 
-        <div id="page-leaderboard" class="page">
-            <h1 style="display: none;">Discriminatory Gamblers - Golf Tracker</h1>
-            <h2>Gamblers' Scores</h2>
-            <div id="gamblers-container"></div>
-            <h2>US OPEN 2025 - Leaderboard</h2>
-            <table id="leaderboard-table">
-                <thead>
-                    <tr><th style="width: 20%;">Gambler</th><th style="width: 10%;">Pos</th><th>Player</th><th style="width: 10%;">Total</th><th style="width: 10%;">Today</th><th style="width: 10%;">Thru</th><th style="width: 10%;">Round</th></tr>
-                </thead>
-                <tbody id="leaderboard-body"></tbody>
-            </table>
-        </div>
+        const activeView = document.getElementById('auction-active-view');
+        const finishedView = document.getElementById('auction-finished-view');
+        const notStartedView = document.getElementById('auction-not-started-view');
+        const gamblerSelect = document.getElementById('auction-gambler-select');
+        const playerSelect = document.getElementById('auction-player-select');
+        const bidAmountInput = document.getElementById('auction-bid-amount');
+        const errorMessageDiv = document.getElementById('auction-error-message');
+        const submitButton = document.getElementById('auction-submit-button');
+        const auctionStatusContainer = document.getElementById('auction-status-container');
+        const auctionResultsContainer = document.getElementById('auction-results-container');
+        const statusIndicator = document.getElementById('auction-status-indicator');
+        const auctionPageLayout = document.getElementById('auction-page-layout');
+        const auctionFormContainer = document.getElementById('auction-form-container');
+        const auctionStatusWrapper = auctionStatusContainer.parentElement;
 
-        <div id="page-gamblers" class="page hidden">
-            <div id="auction-title-container">
-                 <h1 id="auction-main-title" style="font-size: 2em; margin-bottom: 20px; text-align: left;">DG Auction</h1>
-                 <span id="auction-status-indicator"></span>
-            </div>
-            <div id="auction-active-view" class="hidden">
-                <div id="auction-page-layout">
-                    <div id="auction-form-container">
-                         <h2 style="margin-top: 0; border: none;">Place a Bid</h2>
-                         <form id="auction-form">
-                            <div style="margin-bottom: 20px;"><label for="auction-gambler-select">Your Name</label><select id="auction-gambler-select" disabled><option>Loading...</option></select></div>
-                            <div style="margin-bottom: 20px;"><label for="auction-player-select">Player</label><select id="auction-player-select" disabled><option>Loading...</option></select></div>
-                            <div><label for="auction-bid-amount">Your Bid Amount (£)</label><input type="number" id="auction-bid-amount" min="10" placeholder="e.g., 55"></div>
-                            <div id="auction-error-message" style="color: var(--danger-color); margin-top: 15px; text-align: center; font-weight: 600; min-height: 20px;"></div>
-                            <button type="submit" id="auction-submit-button" disabled>Place Bid</button>
-                        </form>
-                    </div>
-                    <div>
-                        <h2 style="margin-top: 0; border: none;">Live Auction Status</h2>
-                        <div id="auction-status-container"><p style="color: var(--text-muted-color);">Loading auction status...</p></div>
-                    </div>
-                </div>
-            </div>
-            <div id="auction-finished-view" class="hidden">
-                 <h2 style="margin-top: 0; border: none;">Final Results</h2>
-                 <div id="auction-results-container"><p style="color: var(--text-muted-color);">Calculating results...</p></div>
-            </div>
-             <div id="auction-not-started-view" class="hidden" style="text-align: center; padding: 40px; background: var(--card-color); border-radius: 12px;">
-                 <p>The auction has not started yet. Please check back later.</p>
-            </div>
-        </div>
-    </div>
-    
-    <!-- The single, unified script -->
-    <script src="app.js" type="module"></script>
-    
-</body>
-</html>
+
+        const firebaseApp = initializeApp(firebaseConfig);
+        const firebaseAuth = getAuth(firebaseApp);
+        const db = getFirestore(firebaseApp);
+        const auctionBidsRef = collection(db, `/artifacts/${appId}/public/data/auctionBids`);
+        const auctionArchivesRef = collection(db, `/artifacts/${appId}/public/data/auctionArchives`);
+
+        const setPageError = (message) => {
+            const pageDiv = document.getElementById('page-gamblers');
+            if (pageDiv) pageDiv.innerHTML = `<p style="color: var(--danger-color); text-align: center; font-weight: 600; padding: 40px;">${message}</p>`;
+        };
+
+        const populateDropdown = (select, data, placeholder, isObject = false) => {
+            select.innerHTML = `<option value="">${placeholder}</option>`;
+            data.forEach(item => {
+                const option = document.createElement('option');
+                option.value = isObject ? item.id : item;
+                option.textContent = isObject ? item.name : item;
+                select.appendChild(option);
+            });
+            select.disabled = false;
+        };
+        
+        const renderFinishedResults = (auctionData) => {
+            const playersWithBids = Object.keys(auctionData);
+            auctionResultsContainer.innerHTML = '';
+
+            if (playersWithBids.length === 0) {
+                auctionResultsContainer.innerHTML = `<p style="color: var(--text-muted-color);">The auction finished with no bids placed.</p>`;
+                return;
+            }
+
+            const sortedPlayerIds = playersWithBids.sort((a, b) => auctionData[a].playerName.localeCompare(auctionData[b].playerName));
+            
+            sortedPlayerIds.forEach(playerId => {
+                const playerData = auctionData[playerId];
+                const card = document.createElement('div');
+                card.className = 'auction-card';
+
+                const highestBidAmount = Math.max(...playerData.bids.map(b => b.amount));
+                const topBids = playerData.bids.filter(b => b.amount === highestBidAmount);
+
+                if (topBids.length > 1) {
+                    // TIE SCENARIO
+                    const tiedGamblers = topBids.map(b => b.gambler).join(', ');
+                    card.style.borderColor = 'var(--status-orange)';
+                    card.innerHTML = `
+                        <div class="player-name">${playerData.playerName}</div>
+                        <div class="bid-info">Highest Bid (Tied):</div>
+                        <div class="highest-bid">£${highestBidAmount.toFixed(0)}</div>
+                        <div class="winner-name" style="color: var(--status-orange);">Tied Bidders: ${tiedGamblers}</div>
+                        <div class="team-status" style="color: var(--danger-color); margin-top: 10px; border-top: none; font-weight: 700;">REMOVED FROM AUCTION</div>
+                    `;
+                } else {
+                    // SINGLE WINNER SCENARIO
+                    const winningBid = topBids[0];
+                    card.innerHTML = `
+                        <div class="player-name">${playerData.playerName}</div>
+                        <div class="bid-info">Winning Bid:</div>
+                        <div class="highest-bid">£${winningBid.amount.toFixed(0)}</div>
+                        <div class="winner-name">Won by: ${winningBid.gambler}</div>
+                    `;
+                }
+                auctionResultsContainer.appendChild(card);
+            });
+        };
+        
+        const handleFormSubmit = async (e) => {
+            e.preventDefault();
+            errorMessageDiv.textContent = '';
+            
+            const selectedGambler = gamblerSelect.value;
+            const selectedPlayerId = playerSelect.value;
+            const bidAmount = parseFloat(bidAmountInput.value);
+
+            if (!selectedGambler || !selectedPlayerId || !bidAmountInput.value) {
+                errorMessageDiv.textContent = 'Please select your name, a player, and a bid.'; return;
+            }
+            if (isNaN(bidAmount) || bidAmount <= 0) {
+                errorMessageDiv.textContent = 'Please enter a valid bid amount.'; return;
+            }
+
+            submitButton.disabled = true;
+            submitButton.textContent = 'Validating...';
+
+            try {
+                const allBidsSnapshot = await getDocs(auctionBidsRef);
+                let gamblerBidCount = 0;
+                allBidsSnapshot.forEach(doc => {
+                    doc.data().bids.forEach(bid => {
+                        if (bid.gambler === selectedGambler) gamblerBidCount++;
+                    });
+                });
+
+                if (gamblerBidCount >= 2) {
+                    throw new Error("You have already placed your maximum of 2 bids.");
+                }
+
+                submitButton.textContent = 'Placing Bid...';
+                const playerDocRef = doc(db, auctionBidsRef.path, selectedPlayerId);
+                const playerDocSnap = await getDoc(playerDocRef);
+                const playerData = playerDocSnap.exists() ? playerDocSnap.data() : null;
+
+                const newBid = { amount: bidAmount, gambler: selectedGambler, timestamp: Date.now() };
+                
+                if (playerData) {
+                    await updateDoc(playerDocRef, { bids: arrayUnion(newBid) });
+                } else {
+                    const playerInfo = allPlayersData.find(p => p.playerId === selectedPlayerId);
+                    const name = playerInfo ? `${playerInfo.firstName} ${playerInfo.lastName}` : 'Unknown Player';
+                    await setDoc(playerDocRef, { playerName: name, bids: [newBid] });
+                }
+                form.reset();
+            } catch (error) {
+                errorMessageDiv.textContent = error.message;
+            } finally {
+                submitButton.disabled = false;
+                submitButton.textContent = 'Place Bid';
+            }
+        };
+        
+        const setupPageByStatus = (status, auctionData) => {
+            [activeView, finishedView, notStartedView].forEach(v => v.classList.add('hidden'));
+            
+            if (auctionPageLayout) auctionPageLayout.style.gridTemplateColumns = '';
+            if (auctionFormContainer) {
+                auctionFormContainer.style.maxWidth = '';
+                auctionFormContainer.style.margin = '';
+            }
+            if(auctionStatusWrapper) auctionStatusWrapper.style.display = '';
+
+            if (statusIndicator) {
+                 switch (status) {
+                    case 'active': 
+                        statusIndicator.textContent = 'Active'; 
+                        statusIndicator.style.backgroundColor = 'var(--status-green)'; 
+                        activeView.classList.remove('hidden'); 
+                        if (auctionStatusWrapper) auctionStatusWrapper.style.display = 'none';
+                        if (auctionPageLayout) auctionPageLayout.style.gridTemplateColumns = '1fr';
+                        if (auctionFormContainer) {
+                            auctionFormContainer.style.maxWidth = '450px';
+                            auctionFormContainer.style.margin = '0 auto';
+                        }
+                        break;
+                    case 'finished': 
+                        statusIndicator.textContent = 'Finished'; 
+                        statusIndicator.style.backgroundColor = 'var(--status-red)'; 
+                        finishedView.classList.remove('hidden'); 
+                        break;
+                    default: 
+                        statusIndicator.textContent = 'Not Started'; 
+                        statusIndicator.style.backgroundColor = 'var(--status-orange)'; 
+                        notStartedView.classList.remove('hidden'); 
+                        break;
+                }
+            }
+            
+            if (status === 'active') {
+                const playersForDropdown = allPlayersData.map(p => ({ id: p.playerId, name: `${p.firstName} ${p.lastName}` })).sort((a,b) => a.name.localeCompare(b.name));
+                populateDropdown(gamblerSelect, availableGamblers, 'Select Your Name');
+                populateDropdown(playerSelect, playersForDropdown, 'Select a Player', true);
+                submitButton.disabled = false;
+                form.addEventListener('submit', handleFormSubmit);
+            } else if (status === 'finished') {
+                renderFinishedResults(auctionData);
+            }
+        };
+
+        const resetAuction = async () => {
+            console.log("Resetting auction data...");
+            const querySnapshot = await getDocs(auctionBidsRef);
+            const deletePromises = [];
+            querySnapshot.forEach((doc) => {
+                deletePromises.push(deleteDoc(doc.ref));
+            });
+            await Promise.all(deletePromises);
+            console.log("Auction data reset successfully.");
+        };
+
+        const archiveAuction = async () => {
+             console.log("Archiving auction data...");
+             const bidsSnapshot = await getDocs(auctionBidsRef);
+             if (bidsSnapshot.empty) {
+                 console.log("No bids to archive.");
+                 return;
+             }
+             
+             const auctionData = {};
+             bidsSnapshot.forEach(doc => {
+                 auctionData[doc.id] = doc.data();
+             });
+             
+             const results = {};
+             for (const playerId in auctionData) {
+                 const playerData = auctionData[playerId];
+                 if (playerData.bids && playerData.bids.length > 0) {
+                     const winningBid = playerData.bids.reduce((max, bid) => bid.amount > max.amount ? bid : max);
+                     results[playerId] = {
+                         playerName: playerData.playerName,
+                         winningBid: winningBid.amount,
+                         winner: winningBid.gambler
+                     };
+                 }
+             }
+             
+             const archiveId = new Date().toISOString();
+             const archiveDocRef = doc(auctionArchivesRef, archiveId);
+             await setDoc(archiveDocRef, {
+                 results,
+                 archivedAt: new Date()
+             });
+             console.log(`Auction results archived successfully with ID: ${archiveId}`);
+        };
+
+        (async function main() {
+            try {
+                await signInAnonymously(firebaseAuth);
+                
+                if (allPlayersData.length === 0) {
+                    setPageError('Player data is not yet available. Please refresh if the leaderboard has loaded.');
+                    return;
+                }
+                
+                const configResponse = await fetch('/config.json');
+                const configData = await configResponse.json();
+                const currentStatus = configData.auctionStatus || 'not_started';
+
+                const PREVIOUS_STATUS_KEY = 'dgg_last_auction_status';
+                const lastKnownStatus = localStorage.getItem(PREVIOUS_STATUS_KEY);
+
+                if (lastKnownStatus && lastKnownStatus !== currentStatus) {
+                    console.log(`Status changed from ${lastKnownStatus} to ${currentStatus}`);
+                    if (currentStatus === 'finished' && lastKnownStatus === 'active') {
+                        await archiveAuction();
+                    } else if (currentStatus === 'active' && lastKnownStatus === 'finished') {
+                        await resetAuction();
+                    }
+                }
+                localStorage.setItem(PREVIOUS_STATUS_KEY, currentStatus);
+
+                onSnapshot(auctionBidsRef, (snapshot) => {
+                    const auctionData = {};
+                    snapshot.forEach(doc => { auctionData[doc.id] = doc.data(); });
+                    setupPageByStatus(currentStatus, auctionData);
+                });
+
+            } catch (error) {
+                console.error("Auction Initialization failed:", error);
+                setPageError(`Auction Initialization failed: ${error.message}`);
+            }
+        })();
+    };
+
+    // --- LEADERBOARD LOGIC (Original) ---
+    (() => {
+        const leaderboardBody = document.getElementById('leaderboard-body');
+        const gamblersContainer = document.getElementById('gamblers-container');
+
+        const parseScore = (score) => {
+            if (typeof score !== 'string' || score.toUpperCase() === 'E' || !score) return 0;
+            const number = parseInt(score, 10);
+            return isNaN(number) ? 0 : number;
+        };
+        const formatScore = (score) => {
+            if (typeof score !== 'number' || isNaN(score)) return { text: 'N/A', className: 'score-even' };
+            if (score === 0) return { text: 'E', className: 'score-even' };
+            if (score > 0) return { text: `+${score}`, className: 'score-over' };
+            return { text: score.toString(), className: 'score-under' };
+        };
+
+        const updateUI = () => {
+            const gamblerData = {};
+            availableGamblers.forEach(gambler => {
+                gamblerData[gambler] = { totalScore: 0, todayScore: 0, players: [], hasMissedCutPlayer: false, missedCutCount: 0, totalPicks: 0 };
+            });
+            allPlayersData.forEach(player => {
+                if (!player || !player.playerId) return;
+                const isOutOfTournament = player.status === 'cut' || player.status === 'wd';
+                const parsedPlayerScore = parseScore(player.total);
+                const parsedTodayScore = parseScore(player.currentRoundScore);
+                const tagsForPlayer = gamblerPicks[player.playerId] || [];
+                tagsForPlayer.forEach(gamblerName => {
+                    const gambler = gamblerData[gamblerName];
+                    if (gambler) {
+                        gambler.totalPicks++;
+                        if (isOutOfTournament) {
+                            gambler.hasMissedCutPlayer = true;
+                            gambler.missedCutCount++;
+                        } else {
+                            gambler.totalScore += parsedPlayerScore;
+                            gambler.todayScore += parsedTodayScore;
+                        }
+                        gambler.players.push({ name: `${player.firstName.charAt(0)}. ${player.lastName}`, score: parsedPlayerScore, hasMissedCut: isOutOfTournament });
+                    }
+                });
+            });
+            const sortedGamblers = Object.entries(gamblerData).sort((a, b) => {
+                const gamblerA = a[1]; const gamblerB = b[1];
+                if (gamblerA.hasMissedCutPlayer && !gamblerB.hasMissedCutPlayer) return 1;
+                if (!gamblerA.hasMissedCutPlayer && gamblerB.hasMissedCutPlayer) return -1;
+                return gamblerA.totalScore - gamblerB.totalScore;
+            });
+            if (gamblersContainer) {
+                gamblersContainer.innerHTML = '';
+                sortedGamblers.forEach(([gamblerName, gamblerInfo]) => {
+                    const card = document.createElement('div');
+                    card.className = 'gambler-card';
+                    let finalScore = gamblerInfo.hasMissedCutPlayer ? { text: formatScore(gamblerInfo.totalScore).text, className: 'score-over' } : formatScore(gamblerInfo.totalScore);
+                    const todayScoreInfo = formatScore(gamblerInfo.todayScore);
+                    const madeCutCount = gamblerInfo.totalPicks - gamblerInfo.missedCutCount;
+                    const teamStatusText = `${madeCutCount}/${gamblerInfo.totalPicks} MADE CUT`;
+                    const playerBreakdownHtml = gamblerInfo.players.map(p => `<div class="player-row ${p.hasMissedCut ? 'missed-cut' : ''}"><span class="player-name">${p.name}</span><span class="player-score ${formatScore(p.score).className}">${formatScore(p.score).text}${p.hasMissedCut ? ' (MC)' : ''}</span></div>`).join('');
+                    card.innerHTML = `<div class="name">${gamblerName}</div><div class="total-score ${finalScore.className}">${finalScore.text}</div><div class="today-score ${todayScoreInfo.className}">Today: ${todayScoreInfo.text}</div><div class="team-status">${teamStatusText}</div><div class="player-breakdown">${playerBreakdownHtml}</div>`;
+                    gamblersContainer.appendChild(card);
+                });
+            }
+            if (leaderboardBody) {
+                leaderboardBody.innerHTML = allPlayersData.map(player => {
+                    if (!player || !player.playerId) return '';
+                    const tagsHtml = (gamblerPicks[player.playerId] || []).map(tag => `<span class="tag">${tag}</span>`).join('');
+                    const totalScoreInfo = formatScore(parseScore(player.total));
+                    const todayScoreInfo = formatScore(parseScore(player.currentRoundScore));
+                    let lastRound = 'N/A';
+                    if (player.rounds && player.rounds.length > 0) {
+                        const lastRoundData = player.rounds[player.rounds.length - 1];
+                        if (lastRoundData && lastRoundData.strokes && lastRoundData.strokes['$numberInt']) lastRound = lastRoundData.strokes['$numberInt'];
+                    }
+                    return `<tr><td>${tagsHtml}</td><td>${player.position || 'N/A'}</td><td>${player.firstName || ''} ${player.lastName || ''}</td><td class="${totalScoreInfo.className}">${totalScoreInfo.text}</td><td class="${todayScoreInfo.className}">${todayScoreInfo.text}</td><td>${player.thru || 'N/A'}</td><td>${lastRound}</td></tr>`;
+                }).join('');
+            }
+        };
+
+        const fetchLeaderboardData = async () => {
+            const { orgId, tournId, year } = tournamentConfig;
+            const url = `/.netlify/functions/get-scores?orgId=${orgId}&tournId=${tournId}&year=${year}`;
+            
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`Live API failed with status: ${response.status}`);
+                const data = await response.json();
+                if (!data.leaderboardRows || data.leaderboardRows.length === 0) {
+                    throw new Error("Live API returned no players.");
+                }
+                console.log("Successfully fetched live player data from API.");
+                allPlayersData = data.leaderboardRows;
+            } catch (error) {
+                console.warn(error.message, "Attempting to use fallback player list.");
+                try {
+                    const response = await fetch('/provisional_players.json');
+                    if (!response.ok) throw new Error("Could not load provisional_players.json");
+                    const provisionalData = await response.json();
+                    console.log("Successfully loaded provisional player data.");
+                    allPlayersData = provisionalData.map((player, index) => ({
+                        playerId: `${player.lastName.toLowerCase()}_${player.firstName.toLowerCase()}_${index}`,
+                        firstName: player.firstName,
+                        lastName: player.lastName,
+                        status: 'active',
+                        total: 'E',
+                        currentRoundScore: 'E',
+                        thru: '-',
+                        rounds: []
+                    }));
+                } catch (fallbackError) {
+                    console.error("Fallback failed:", fallbackError);
+                    if (gamblersContainer) gamblersContainer.innerHTML = `<p style="color: #d9534f; font-weight: bold;">Could not load live or provisional player data.</p>`;
+                    return;
+                }
+            }
+            updateUI();
+        };
+
+        (async function main() {
+            try {
+                const [configResponse, picksResponse] = await Promise.all([ fetch('/config.json'), fetch('/picks.json') ]);
+                if (!configResponse.ok || !picksResponse.ok) throw new Error('Failed to load initial config files.');
+                const configData = await configResponse.json();
+                gamblerPicks = await picksResponse.json();
+                availableGamblers = configData.gamblers;
+                tournamentConfig = configData.tournament;
+                await fetchLeaderboardData(); 
+                setInterval(fetchLeaderboardData, 60000);
+            } catch (error) {
+                console.error("Initialization failed:", error);
+                if (gamblersContainer) gamblersContainer.innerHTML = `<p style="color: #d9534f; font-weight: bold;">Error: ${error.message}</p>`;
+            }
+        })();
+    })();
+});
