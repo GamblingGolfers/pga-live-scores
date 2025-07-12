@@ -3,7 +3,7 @@
 // Import Firebase modules first
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, collection, doc, setDoc, updateDoc, arrayUnion, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getFirestore, collection, doc, getDoc, setDoc, updateDoc, arrayUnion, onSnapshot, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 document.addEventListener('DOMContentLoaded', () => {
     
@@ -38,6 +38,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const form = document.getElementById('auction-form');
         if (!form) return;
+
+        const MIN_BID_INCREMENT = 5;
+        const ABSOLUTE_MIN_BID = 10;
         
         const firebaseConfig = {
           apiKey: "AIzaSyCxORo_xPNGACIRk5JryuXvxU4wSzwtdvE",
@@ -61,11 +64,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const auctionStatusContainer = document.getElementById('auction-status-container');
         const auctionResultsContainer = document.getElementById('auction-results-container');
         const statusIndicator = document.getElementById('auction-status-indicator');
+        const auctionPageLayout = document.getElementById('auction-page-layout');
+        const auctionFormContainer = document.getElementById('auction-form-container');
+        const auctionStatusWrapper = auctionStatusContainer.parentElement;
+
 
         const firebaseApp = initializeApp(firebaseConfig);
         const firebaseAuth = getAuth(firebaseApp);
         const db = getFirestore(firebaseApp);
-        const auctionCollectionRef = collection(db, `/artifacts/${appId}/public/data/auctionBids`);
+        const auctionBidsRef = collection(db, `/artifacts/${appId}/public/data/auctionBids`);
+        const auctionArchivesRef = collection(db, `/artifacts/${appId}/public/data/auctionArchives`);
 
         const setPageError = (message) => {
             const pageDiv = document.getElementById('page-gamblers');
@@ -83,19 +91,6 @@ document.addEventListener('DOMContentLoaded', () => {
             select.disabled = false;
         };
         
-        const renderAuctionStatus = (auctionData) => {
-            const playersWithBids = Object.keys(auctionData);
-            auctionStatusContainer.innerHTML = playersWithBids.length === 0 
-                ? `<p style="color: var(--text-muted-color);">No bids placed yet. Be the first!</p>`
-                : playersWithBids.sort((a, b) => auctionData[a].playerName.localeCompare(auctionData[b].playerName))
-                  .map(playerId => {
-                    const playerData = auctionData[playerId];
-                    const highestBid = Math.max(...playerData.bids.map(b => b.amount));
-                    return `<div class="auction-card"><div class="player-name">${playerData.playerName}</div><div class="bid-info">Bids Received: <strong>${playerData.bids.length}</strong></div><div class="highest-bid">£${highestBid.toFixed(0)}</div></div>`;
-                  }).join('');
-        };
-        
-        // --- NEW: Updated function to handle tie-breaking logic ---
         const renderFinishedResults = (auctionData) => {
             const playersWithBids = Object.keys(auctionData);
             auctionResultsContainer.innerHTML = '';
@@ -140,7 +135,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         };
         
-        // --- NEW: Simplified function with no bid validation ---
         const handleFormSubmit = async (e) => {
             e.preventDefault();
             errorMessageDiv.textContent = '';
@@ -160,17 +154,15 @@ document.addEventListener('DOMContentLoaded', () => {
             submitButton.textContent = 'Placing Bid...';
 
             try {
-                const playerDocRef = doc(db, auctionCollectionRef.path, selectedPlayerId);
+                const playerDocRef = doc(db, auctionBidsRef.path, selectedPlayerId);
                 const playerDocSnap = await getDoc(playerDocRef);
                 const playerData = playerDocSnap.exists() ? playerDocSnap.data() : null;
 
                 const newBid = { amount: bidAmount, gambler: selectedGambler, timestamp: Date.now() };
                 
                 if (playerData) {
-                    // If player document exists, just add the new bid to the array
                     await updateDoc(playerDocRef, { bids: arrayUnion(newBid) });
                 } else {
-                    // If it's the first bid ever for this player, create the document
                     const playerInfo = allPlayersData.find(p => p.playerId === selectedPlayerId);
                     const name = playerInfo ? `${playerInfo.firstName} ${playerInfo.lastName}` : 'Unknown Player';
                     await setDoc(playerDocRef, { playerName: name, bids: [newBid] });
@@ -187,23 +179,98 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const setupPageByStatus = (status, auctionData) => {
             [activeView, finishedView, notStartedView].forEach(v => v.classList.add('hidden'));
+            
+            // Reset layout styles before applying new ones
+            if (auctionPageLayout) auctionPageLayout.style.gridTemplateColumns = '';
+            if (auctionFormContainer) {
+                auctionFormContainer.style.maxWidth = '';
+                auctionFormContainer.style.margin = '';
+            }
+            if(auctionStatusWrapper) auctionStatusWrapper.classList.remove('hidden');
+
             if (statusIndicator) {
                  switch (status) {
-                    case 'active': statusIndicator.textContent = 'Active'; statusIndicator.style.backgroundColor = 'var(--status-green)'; activeView.classList.remove('hidden'); break;
-                    case 'finished': statusIndicator.textContent = 'Finished'; statusIndicator.style.backgroundColor = 'var(--status-red)'; finishedView.classList.remove('hidden'); break;
-                    default: statusIndicator.textContent = 'Not Started'; statusIndicator.style.backgroundColor = 'var(--status-orange)'; notStartedView.classList.remove('hidden'); break;
+                    case 'active': 
+                        statusIndicator.textContent = 'Active'; 
+                        statusIndicator.style.backgroundColor = 'var(--status-green)'; 
+                        activeView.classList.remove('hidden'); 
+                        // Hide status board and center form
+                        if (auctionStatusWrapper) auctionStatusWrapper.classList.add('hidden');
+                        if (auctionPageLayout) auctionPageLayout.style.gridTemplateColumns = '1fr';
+                        if (auctionFormContainer) {
+                            auctionFormContainer.style.maxWidth = '450px';
+                            auctionFormContainer.style.margin = '0 auto';
+                        }
+                        break;
+                    case 'finished': 
+                        statusIndicator.textContent = 'Finished'; 
+                        statusIndicator.style.backgroundColor = 'var(--status-red)'; 
+                        finishedView.classList.remove('hidden'); 
+                        break;
+                    default: 
+                        statusIndicator.textContent = 'Not Started'; 
+                        statusIndicator.style.backgroundColor = 'var(--status-orange)'; 
+                        notStartedView.classList.remove('hidden'); 
+                        break;
                 }
             }
+            
             if (status === 'active') {
                 const playersForDropdown = allPlayersData.map(p => ({ id: p.playerId, name: `${p.firstName} ${p.lastName}` })).sort((a,b) => a.name.localeCompare(b.name));
                 populateDropdown(gamblerSelect, availableGamblers, 'Select Your Name');
                 populateDropdown(playerSelect, playersForDropdown, 'Select a Player', true);
                 submitButton.disabled = false;
                 form.addEventListener('submit', handleFormSubmit);
-                renderAuctionStatus(auctionData);
+                // No need to render status, as it's hidden
             } else if (status === 'finished') {
                 renderFinishedResults(auctionData);
             }
+        };
+
+        const resetAuction = async () => {
+            console.log("Resetting auction data...");
+            const querySnapshot = await getDocs(auctionBidsRef);
+            const deletePromises = [];
+            querySnapshot.forEach((doc) => {
+                deletePromises.push(deleteDoc(doc.ref));
+            });
+            await Promise.all(deletePromises);
+            console.log("Auction data reset successfully.");
+        };
+
+        const archiveAuction = async () => {
+             console.log("Archiving auction data...");
+             const bidsSnapshot = await getDocs(auctionBidsRef);
+             if (bidsSnapshot.empty) {
+                 console.log("No bids to archive.");
+                 return;
+             }
+             
+             const auctionData = {};
+             bidsSnapshot.forEach(doc => {
+                 auctionData[doc.id] = doc.data();
+             });
+             
+             const results = {};
+             for (const playerId in auctionData) {
+                 const playerData = auctionData[playerId];
+                 if (playerData.bids && playerData.bids.length > 0) {
+                     const winningBid = playerData.bids.reduce((max, bid) => bid.amount > max.amount ? bid : max);
+                     results[playerId] = {
+                         playerName: playerData.playerName,
+                         winningBid: winningBid.amount,
+                         winner: winningBid.gambler
+                     };
+                 }
+             }
+             
+             const archiveId = new Date().toISOString();
+             const archiveDocRef = doc(auctionArchivesRef, archiveId);
+             await setDoc(archiveDocRef, {
+                 results,
+                 archivedAt: new Date()
+             });
+             console.log(`Auction results archived successfully with ID: ${archiveId}`);
         };
 
         (async function main() {
@@ -218,8 +285,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 const configResponse = await fetch('/config.json');
                 const configData = await configResponse.json();
                 const currentStatus = configData.auctionStatus || 'not_started';
-                
-                onSnapshot(auctionCollectionRef, (snapshot) => {
+
+                const PREVIOUS_STATUS_KEY = 'dgg_last_auction_status';
+                const lastKnownStatus = localStorage.getItem(PREVIOUS_STATUS_KEY);
+
+                if (lastKnownStatus && lastKnownStatus !== currentStatus) {
+                    console.log(`Status changed from ${lastKnownStatus} to ${currentStatus}`);
+                    if (currentStatus === 'finished' && lastKnownStatus === 'active') {
+                        await archiveAuction();
+                    } else if (currentStatus === 'active' && lastKnownStatus === 'finished') {
+                        await resetAuction();
+                    }
+                }
+                localStorage.setItem(PREVIOUS_STATUS_KEY, currentStatus);
+
+                onSnapshot(auctionBidsRef, (snapshot) => {
                     const auctionData = {};
                     snapshot.forEach(doc => { auctionData[doc.id] = doc.data(); });
                     setupPageByStatus(currentStatus, auctionData);
