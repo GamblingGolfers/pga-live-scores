@@ -14,16 +14,13 @@ document.addEventListener('DOMContentLoaded', () => {
     let allPlayersData = [];
     let isAuctionInitialized = false;
 
-    // --- DOM ELEMENTS ---
+    // --- NAVIGATION ---
     const navContainer = document.getElementById('nav-container');
     const pages = document.querySelectorAll('.page');
-    const auctionNavButton = document.querySelector('.nav-button[data-page="gamblers"]');
-    
-    // --- NAVIGATION ---
     if (navContainer) {
         navContainer.addEventListener('click', (e) => {
             const button = e.target.closest('.nav-button');
-            if (button && !button.disabled) { // Only allow clicks on enabled buttons
+            if (button) {
                 const targetPageId = button.dataset.page;
                 pages.forEach(p => p.classList.toggle('hidden', p.id !== `page-${targetPageId}`));
                 navContainer.querySelectorAll('.nav-button').forEach(btn => btn.classList.remove('active'));
@@ -72,7 +69,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const auctionPageLayout = document.getElementById('auction-page-layout');
         const auctionFormContainer = document.getElementById('auction-form-container');
         const auctionStatusWrapper = auctionStatusContainer.parentElement;
-
 
         const firebaseApp = initializeApp(firebaseConfig);
         const firebaseAuth = getAuth(firebaseApp);
@@ -241,7 +237,7 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 await signInAnonymously(firebaseAuth);
                 if (allPlayersData.length === 0) {
-                    setPageError('Player data is not yet available.');
+                    setPageError('Player data is not available. Please check the Leaderboard page first.');
                     return;
                 }
                 const configResponse = await fetch('/config.json');
@@ -345,60 +341,33 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
-        const fetchLeaderboardData = async () => {
-            const { orgId, tournId, year } = tournamentConfig;
-            const url = `/.netlify/functions/get-scores?orgId=${orgId}&tournId=${tournId}&year=${year}`;
-            
-            try {
+        const fetchPlayerData = async (config) => {
+            if (config.playerDataSource === 'provisional') {
+                console.log("Using provisional player list from config.");
+                const response = await fetch('/provisional_players.json');
+                if (!response.ok) throw new Error("Could not load provisional_players.json");
+                const provisionalData = await response.json();
+                return provisionalData.map((player, index) => ({
+                    playerId: `${player.lastName.toLowerCase()}_${player.firstName.toLowerCase()}_${index}`,
+                    firstName: player.firstName,
+                    lastName: player.lastName,
+                    status: 'active', total: 'E', currentRoundScore: 'E', thru: '-', rounds: []
+                }));
+            } else {
+                console.log("Fetching live player data from API.");
+                const url = `/.netlify/functions/get-scores?orgId=${config.tournament.orgId}&tournId=${config.tournament.tournId}&year=${config.tournament.year}`;
                 const response = await fetch(url);
                 if (!response.ok) throw new Error(`Live API failed with status: ${response.status}`);
                 const data = await response.json();
                 if (!data.leaderboardRows || data.leaderboardRows.length === 0) {
                     throw new Error("Live API returned no players.");
                 }
-                console.log("Successfully fetched live player data from API.");
-                allPlayersData = data.leaderboardRows;
-            } catch (error) {
-                console.warn(error.message, "Attempting to use fallback player list.");
-                try {
-                    const response = await fetch('/provisional_players.json');
-                    if (!response.ok) throw new Error("Could not load provisional_players.json");
-                    const provisionalData = await response.json();
-                    console.log("Successfully loaded provisional player data.");
-                    allPlayersData = provisionalData.map((player, index) => ({
-                        playerId: `${player.lastName.toLowerCase()}_${player.firstName.toLowerCase()}_${index}`,
-                        firstName: player.firstName,
-                        lastName: player.lastName,
-                        status: 'active',
-                        total: 'E',
-                        currentRoundScore: 'E',
-                        thru: '-',
-                        rounds: []
-                    }));
-                } catch (fallbackError) {
-                    console.error("Fallback failed:", fallbackError);
-                    if (gamblersContainer) gamblersContainer.innerHTML = `<p style="color: #d9534f; font-weight: bold;">Could not load live or provisional player data.</p>`;
-                    return;
-                }
-            }
-            updateUI();
-
-            // --- THIS IS THE FIX ---
-            // Enable the auction button only after the first successful data fetch.
-            if (auctionNavButton) {
-                auctionNavButton.disabled = false;
-                auctionNavButton.style.cursor = 'pointer';
+                return data.leaderboardRows;
             }
         };
 
         (async function main() {
             try {
-                // Disable auction button initially to prevent race condition
-                if(auctionNavButton) {
-                    auctionNavButton.disabled = true;
-                    auctionNavButton.style.cursor = 'not-allowed';
-                }
-
                 const [configResponse, picksResponse] = await Promise.all([ fetch('/config.json'), fetch('/picks.json') ]);
                 if (!configResponse.ok || !picksResponse.ok) throw new Error('Failed to load initial config files.');
                 const configData = await configResponse.json();
@@ -406,9 +375,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 availableGamblers = configData.gamblers;
                 tournamentConfig = configData.tournament;
                 
-                // Fetch data once on load, then enable auction and set interval
-                await fetchLeaderboardData(); 
-                setInterval(fetchLeaderboardData, 60000);
+                allPlayersData = await fetchPlayerData(configData);
+                updateUI();
+                
+                // Only set the interval for the live API source
+                if (configData.playerDataSource === 'api') {
+                     setInterval(() => fetchPlayerData(configData).then(updateUI), 60000);
+                }
 
             } catch (error) {
                 console.error("Initialization failed:", error);
