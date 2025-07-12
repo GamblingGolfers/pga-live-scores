@@ -38,9 +38,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const form = document.getElementById('auction-form');
         if (!form) return;
-
-        const MIN_BID_INCREMENT = 5;
-        const ABSOLUTE_MIN_BID = 10;
         
         const firebaseConfig = {
           apiKey: "AIzaSyCxORo_xPNGACIRk5JryuXvxU4wSzwtdvE",
@@ -133,6 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         };
         
+        // --- NEW: Updated function to check bid limit ---
         const handleFormSubmit = async (e) => {
             e.preventDefault();
             errorMessageDiv.textContent = '';
@@ -149,9 +147,27 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             submitButton.disabled = true;
-            submitButton.textContent = 'Placing Bid...';
+            submitButton.textContent = 'Validating...';
 
             try {
+                // Check the number of bids the gambler has already made
+                const allBidsSnapshot = await getDocs(auctionBidsRef);
+                let gamblerBidCount = 0;
+                allBidsSnapshot.forEach(doc => {
+                    const playerData = doc.data();
+                    playerData.bids.forEach(bid => {
+                        if (bid.gambler === selectedGambler) {
+                            gamblerBidCount++;
+                        }
+                    });
+                });
+
+                if (gamblerBidCount >= 2) {
+                    throw new Error("You have already placed your maximum of 2 bids.");
+                }
+
+                // If check passes, proceed with placing the bid
+                submitButton.textContent = 'Placing Bid...';
                 const playerDocRef = doc(db, auctionBidsRef.path, selectedPlayerId);
                 const playerDocSnap = await getDoc(playerDocRef);
                 const playerData = playerDocSnap.exists() ? playerDocSnap.data() : null;
@@ -167,8 +183,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 form.reset();
             } catch (error) {
-                errorMessageDiv.textContent = "Error placing bid. Please try again.";
-                console.error("Bid submission error:", error);
+                errorMessageDiv.textContent = error.message;
             } finally {
                 submitButton.disabled = false;
                 submitButton.textContent = 'Place Bid';
@@ -178,12 +193,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const setupPageByStatus = (status, auctionData) => {
             [activeView, finishedView, notStartedView].forEach(v => v.classList.add('hidden'));
             
-            if (auctionStatusWrapper) auctionStatusWrapper.style.display = '';
             if (auctionPageLayout) auctionPageLayout.style.gridTemplateColumns = '';
             if (auctionFormContainer) {
                 auctionFormContainer.style.maxWidth = '';
                 auctionFormContainer.style.margin = '';
             }
+            if(auctionStatusWrapper) auctionStatusWrapper.classList.remove('hidden');
 
             if (statusIndicator) {
                  switch (status) {
@@ -191,7 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         statusIndicator.textContent = 'Active'; 
                         statusIndicator.style.backgroundColor = 'var(--status-green)'; 
                         activeView.classList.remove('hidden'); 
-                        if (auctionStatusWrapper) auctionStatusWrapper.style.display = 'none';
+                        if (auctionStatusWrapper) auctionStatusWrapper.classList.add('hidden');
                         if (auctionPageLayout) auctionPageLayout.style.gridTemplateColumns = '1fr';
                         if (auctionFormContainer) {
                             auctionFormContainer.style.maxWidth = '450px';
