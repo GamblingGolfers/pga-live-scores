@@ -14,22 +14,17 @@ document.addEventListener('DOMContentLoaded', () => {
     let allPlayersData = [];
     let isAuctionInitialized = false;
 
-    // --- DOM ELEMENTS ---
+    // --- NAVIGATION ---
     const navContainer = document.getElementById('nav-container');
     const pages = document.querySelectorAll('.page');
-    const leaderboardBody = document.getElementById('leaderboard-body');
-    const gamblersContainer = document.getElementById('gamblers-container');
-
-    // --- NAVIGATION ---
     if (navContainer) {
         navContainer.addEventListener('click', (e) => {
-            const button = e.target.closest('.nav-button');
-            if (button) {
-                const targetPageId = button.dataset.page;
+            if (e.target.classList.contains('nav-button')) {
+                const targetPageId = e.target.dataset.page;
                 pages.forEach(p => p.classList.toggle('hidden', p.id !== `page-${targetPageId}`));
                 navContainer.querySelectorAll('.nav-button').forEach(btn => btn.classList.remove('active'));
-                button.classList.add('active');
-                
+                e.target.classList.add('active');
+                // Initialize auction only when the tab is clicked for the first time
                 if (targetPageId === 'gamblers' && !isAuctionInitialized) {
                     initializeAuctionFeature();
                 }
@@ -45,6 +40,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const form = document.getElementById('auction-form');
         if (!form) return;
 
+        const MIN_BID_INCREMENT = 5;
+        const ABSOLUTE_MIN_BID = 10;
+        
         const firebaseConfig = {
           apiKey: "AIzaSyCxORo_xPNGACIRk5JryuXvxU4wSzwtdvE",
           authDomain: "gambling-golfers.firebaseapp.com",
@@ -71,6 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const auctionFormContainer = document.getElementById('auction-form-container');
         const auctionStatusWrapper = auctionStatusContainer.parentElement;
 
+
         const firebaseApp = initializeApp(firebaseConfig);
         const firebaseAuth = getAuth(firebaseApp);
         const db = getFirestore(firebaseApp);
@@ -96,24 +95,42 @@ document.addEventListener('DOMContentLoaded', () => {
         const renderFinishedResults = (auctionData) => {
             const playersWithBids = Object.keys(auctionData);
             auctionResultsContainer.innerHTML = '';
+
             if (playersWithBids.length === 0) {
                 auctionResultsContainer.innerHTML = `<p style="color: var(--text-muted-color);">The auction finished with no bids placed.</p>`;
                 return;
             }
+
             const sortedPlayerIds = playersWithBids.sort((a, b) => auctionData[a].playerName.localeCompare(auctionData[b].playerName));
+            
             sortedPlayerIds.forEach(playerId => {
                 const playerData = auctionData[playerId];
                 const card = document.createElement('div');
                 card.className = 'auction-card';
+
                 const highestBidAmount = Math.max(...playerData.bids.map(b => b.amount));
                 const topBids = playerData.bids.filter(b => b.amount === highestBidAmount);
+
                 if (topBids.length > 1) {
+                    // TIE SCENARIO
                     const tiedGamblers = topBids.map(b => b.gambler).join(', ');
                     card.style.borderColor = 'var(--status-orange)';
-                    card.innerHTML = `<div class="player-name">${playerData.playerName}</div><div class="bid-info">Highest Bid (Tied):</div><div class="highest-bid">£${highestBidAmount.toFixed(0)}</div><div class="winner-name" style="color: var(--status-orange);">Tied Bidders: ${tiedGamblers}</div><div class="team-status" style="color: var(--danger-color); margin-top: 10px; border-top: none; font-weight: 700;">REMOVED FROM AUCTION</div>`;
+                    card.innerHTML = `
+                        <div class="player-name">${playerData.playerName}</div>
+                        <div class="bid-info">Highest Bid (Tied):</div>
+                        <div class="highest-bid">£${highestBidAmount.toFixed(0)}</div>
+                        <div class="winner-name" style="color: var(--status-orange);">Tied Bidders: ${tiedGamblers}</div>
+                        <div class="team-status" style="color: var(--danger-color); margin-top: 10px; border-top: none; font-weight: 700;">REMOVED FROM AUCTION</div>
+                    `;
                 } else {
+                    // SINGLE WINNER SCENARIO
                     const winningBid = topBids[0];
-                    card.innerHTML = `<div class="player-name">${playerData.playerName}</div><div class="bid-info">Winning Bid:</div><div class="highest-bid">£${winningBid.amount.toFixed(0)}</div><div class="winner-name">Won by: ${winningBid.gambler}</div>`;
+                    card.innerHTML = `
+                        <div class="player-name">${playerData.playerName}</div>
+                        <div class="bid-info">Winning Bid:</div>
+                        <div class="highest-bid">£${winningBid.amount.toFixed(0)}</div>
+                        <div class="winner-name">Won by: ${winningBid.gambler}</div>
+                    `;
                 }
                 auctionResultsContainer.appendChild(card);
             });
@@ -122,17 +139,21 @@ document.addEventListener('DOMContentLoaded', () => {
         const handleFormSubmit = async (e) => {
             e.preventDefault();
             errorMessageDiv.textContent = '';
+            
             const selectedGambler = gamblerSelect.value;
             const selectedPlayerId = playerSelect.value;
             const bidAmount = parseFloat(bidAmountInput.value);
+
             if (!selectedGambler || !selectedPlayerId || !bidAmountInput.value) {
                 errorMessageDiv.textContent = 'Please select your name, a player, and a bid.'; return;
             }
             if (isNaN(bidAmount) || bidAmount <= 0) {
                 errorMessageDiv.textContent = 'Please enter a valid bid amount.'; return;
             }
+
             submitButton.disabled = true;
             submitButton.textContent = 'Validating...';
+
             try {
                 const allBidsSnapshot = await getDocs(auctionBidsRef);
                 let gamblerBidCount = 0;
@@ -141,14 +162,18 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (bid.gambler === selectedGambler) gamblerBidCount++;
                     });
                 });
+
                 if (gamblerBidCount >= 2) {
                     throw new Error("You have already placed your maximum of 2 bids.");
                 }
+
                 submitButton.textContent = 'Placing Bid...';
                 const playerDocRef = doc(db, auctionBidsRef.path, selectedPlayerId);
                 const playerDocSnap = await getDoc(playerDocRef);
                 const playerData = playerDocSnap.exists() ? playerDocSnap.data() : null;
+
                 const newBid = { amount: bidAmount, gambler: selectedGambler, timestamp: Date.now() };
+                
                 if (playerData) {
                     await updateDoc(playerDocRef, { bids: arrayUnion(newBid) });
                 } else {
@@ -167,12 +192,14 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const setupPageByStatus = (status, auctionData) => {
             [activeView, finishedView, notStartedView].forEach(v => v.classList.add('hidden'));
+            
             if (auctionPageLayout) auctionPageLayout.style.gridTemplateColumns = '';
             if (auctionFormContainer) {
                 auctionFormContainer.style.maxWidth = '';
                 auctionFormContainer.style.margin = '';
             }
             if(auctionStatusWrapper) auctionStatusWrapper.style.display = '';
+
             if (statusIndicator) {
                  switch (status) {
                     case 'active': 
@@ -198,6 +225,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         break;
                 }
             }
+            
             if (status === 'active') {
                 const playersForDropdown = allPlayersData.map(p => ({ id: p.playerId, name: `${p.firstName} ${p.lastName}` })).sort((a,b) => a.name.localeCompare(b.name));
                 populateDropdown(gamblerSelect, availableGamblers, 'Select Your Name');
@@ -210,52 +238,83 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         const resetAuction = async () => {
+            console.log("Resetting auction data...");
             const querySnapshot = await getDocs(auctionBidsRef);
             const deletePromises = [];
-            querySnapshot.forEach((doc) => deletePromises.push(deleteDoc(doc.ref)));
+            querySnapshot.forEach((doc) => {
+                deletePromises.push(deleteDoc(doc.ref));
+            });
             await Promise.all(deletePromises);
+            console.log("Auction data reset successfully.");
         };
 
         const archiveAuction = async () => {
+             console.log("Archiving auction data...");
              const bidsSnapshot = await getDocs(auctionBidsRef);
-             if (bidsSnapshot.empty) return;
+             if (bidsSnapshot.empty) {
+                 console.log("No bids to archive.");
+                 return;
+             }
+             
              const auctionData = {};
-             bidsSnapshot.forEach(doc => { auctionData[doc.id] = doc.data(); });
+             bidsSnapshot.forEach(doc => {
+                 auctionData[doc.id] = doc.data();
+             });
+             
              const results = {};
              for (const playerId in auctionData) {
                  const playerData = auctionData[playerId];
                  if (playerData.bids && playerData.bids.length > 0) {
                      const winningBid = playerData.bids.reduce((max, bid) => bid.amount > max.amount ? bid : max);
-                     results[playerId] = { playerName: playerData.playerName, winningBid: winningBid.amount, winner: winningBid.gambler };
+                     results[playerId] = {
+                         playerName: playerData.playerName,
+                         winningBid: winningBid.amount,
+                         winner: winningBid.gambler
+                     };
                  }
              }
+             
              const archiveId = new Date().toISOString();
              const archiveDocRef = doc(auctionArchivesRef, archiveId);
-             await setDoc(archiveDocRef, { results, archivedAt: new Date() });
+             await setDoc(archiveDocRef, {
+                 results,
+                 archivedAt: new Date()
+             });
+             console.log(`Auction results archived successfully with ID: ${archiveId}`);
         };
 
         (async function main() {
             try {
                 await signInAnonymously(firebaseAuth);
+                
                 if (allPlayersData.length === 0) {
-                    setPageError('Player data is not available. Please check the Leaderboard page first.');
+                    setPageError('Player data is not yet available. Please refresh the page.');
                     return;
                 }
+                
                 const configResponse = await fetch('/config.json');
                 const configData = await configResponse.json();
                 const currentStatus = configData.auctionStatus || 'not_started';
+
                 const PREVIOUS_STATUS_KEY = 'dgg_last_auction_status';
                 const lastKnownStatus = localStorage.getItem(PREVIOUS_STATUS_KEY);
+
                 if (lastKnownStatus && lastKnownStatus !== currentStatus) {
-                    if (currentStatus === 'finished' && lastKnownStatus === 'active') await archiveAuction();
-                    else if (currentStatus === 'active' && lastKnownStatus === 'finished') await resetAuction();
+                    console.log(`Status changed from ${lastKnownStatus} to ${currentStatus}`);
+                    if (currentStatus === 'finished' && lastKnownStatus === 'active') {
+                        await archiveAuction();
+                    } else if (currentStatus === 'active' && lastKnownStatus === 'finished') {
+                        await resetAuction();
+                    }
                 }
                 localStorage.setItem(PREVIOUS_STATUS_KEY, currentStatus);
+
                 onSnapshot(auctionBidsRef, (snapshot) => {
                     const auctionData = {};
                     snapshot.forEach(doc => { auctionData[doc.id] = doc.data(); });
                     setupPageByStatus(currentStatus, auctionData);
                 });
+
             } catch (error) {
                 console.error("Auction Initialization failed:", error);
                 setPageError(`Auction Initialization failed: ${error.message}`);
@@ -265,6 +324,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- LEADERBOARD & MAIN APP LOGIC ---
     (() => {
+        const leaderboardBody = document.getElementById('leaderboard-body');
+        const gamblersContainer = document.getElementById('gamblers-container');
+
         const parseScore = (score) => {
             if (typeof score !== 'string' || score.toUpperCase() === 'E' || !score) return 0;
             const number = parseInt(score, 10);
@@ -340,13 +402,11 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         const fetchPlayerData = async (config) => {
-            // --- NEW: Simplified and corrected data source logic ---
             if (config.playerDataSource === 'provisional') {
                 console.log("Using provisional player list from config.");
                 const response = await fetch('/provisional_players.json');
                 if (!response.ok) throw new Error("Could not load provisional_players.json");
                 const provisionalData = await response.json();
-                // Map provisional data to the structure the app expects
                 return provisionalData.map((player, index) => ({
                     playerId: `${player.lastName.toLowerCase()}_${player.firstName.toLowerCase()}_${index}`.replace(/\s/g, ''),
                     firstName: player.firstName,
@@ -354,7 +414,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     status: 'active', total: 'E', currentRoundScore: 'E', thru: '-', rounds: []
                 }));
             } else {
-                // Default to API if not set to provisional
                 console.log("Fetching live player data from API.");
                 const url = `/.netlify/functions/get-scores?orgId=${config.tournament.orgId}&tournId=${config.tournament.tournId}&year=${config.tournament.year}`;
                 const response = await fetch(url);
@@ -379,7 +438,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 allPlayersData = await fetchPlayerData(configData);
                 updateUI();
                 
-                // Only set the interval for the live API source
                 if (configData.playerDataSource === 'api') {
                      setInterval(() => fetchPlayerData(configData).then(updateUI), 60000);
                 }
