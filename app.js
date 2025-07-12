@@ -113,7 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (topBids.length > 1) {
                     // TIE SCENARIO
                     const tiedGamblers = topBids.map(b => b.gambler).join(', ');
-                    card.style.borderColor = 'var(--status-orange)'; // Highlight tied cards
+                    card.style.borderColor = 'var(--status-orange)';
                     card.innerHTML = `
                         <div class="player-name">${playerData.playerName}</div>
                         <div class="bid-info">Highest Bid (Tied):</div>
@@ -194,7 +194,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         statusIndicator.textContent = 'Active'; 
                         statusIndicator.style.backgroundColor = 'var(--status-green)'; 
                         activeView.classList.remove('hidden'); 
-                        // Hide status board and center form
+                        // --- NEW LOGIC ---
+                        // Hide the status board wrapper and center the form
                         if (auctionStatusWrapper) auctionStatusWrapper.classList.add('hidden');
                         if (auctionPageLayout) auctionPageLayout.style.gridTemplateColumns = '1fr';
                         if (auctionFormContainer) {
@@ -221,7 +222,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 populateDropdown(playerSelect, playersForDropdown, 'Select a Player', true);
                 submitButton.disabled = false;
                 form.addEventListener('submit', handleFormSubmit);
-                // No need to render status, as it's hidden
             } else if (status === 'finished') {
                 renderFinishedResults(auctionData);
             }
