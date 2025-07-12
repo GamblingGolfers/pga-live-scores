@@ -111,7 +111,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const topBids = playerData.bids.filter(b => b.amount === highestBidAmount);
 
                 if (topBids.length > 1) {
-                    // TIE SCENARIO
                     const tiedGamblers = topBids.map(b => b.gambler).join(', ');
                     card.style.borderColor = 'var(--status-orange)';
                     card.innerHTML = `
@@ -122,7 +121,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="team-status" style="color: var(--danger-color); margin-top: 10px; border-top: none; font-weight: 700;">REMOVED FROM AUCTION</div>
                     `;
                 } else {
-                    // SINGLE WINNER SCENARIO
                     const winningBid = topBids[0];
                     card.innerHTML = `
                         <div class="player-name">${playerData.playerName}</div>
@@ -180,13 +178,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const setupPageByStatus = (status, auctionData) => {
             [activeView, finishedView, notStartedView].forEach(v => v.classList.add('hidden'));
             
-            // Reset layout styles before applying new ones
+            if (auctionStatusWrapper) auctionStatusWrapper.style.display = '';
             if (auctionPageLayout) auctionPageLayout.style.gridTemplateColumns = '';
             if (auctionFormContainer) {
                 auctionFormContainer.style.maxWidth = '';
                 auctionFormContainer.style.margin = '';
             }
-            if(auctionStatusWrapper) auctionStatusWrapper.classList.remove('hidden');
 
             if (statusIndicator) {
                  switch (status) {
@@ -194,8 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         statusIndicator.textContent = 'Active'; 
                         statusIndicator.style.backgroundColor = 'var(--status-green)'; 
                         activeView.classList.remove('hidden'); 
-                        // Hide status board and center form
-                        if (auctionStatusWrapper) auctionStatusWrapper.classList.add('hidden');
+                        if (auctionStatusWrapper) auctionStatusWrapper.style.display = 'none';
                         if (auctionPageLayout) auctionPageLayout.style.gridTemplateColumns = '1fr';
                         if (auctionFormContainer) {
                             auctionFormContainer.style.maxWidth = '450px';
@@ -221,7 +217,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 populateDropdown(playerSelect, playersForDropdown, 'Select a Player', true);
                 submitButton.disabled = false;
                 form.addEventListener('submit', handleFormSubmit);
-                // No need to render status, as it's hidden
             } else if (status === 'finished') {
                 renderFinishedResults(auctionData);
             }
