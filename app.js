@@ -23,13 +23,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (navContainer) {
         navContainer.addEventListener('click', (e) => {
             const button = e.target.closest('.nav-button');
-            if (button) {
+            if (button && !button.disabled) { // Only allow clicks on enabled buttons
                 const targetPageId = button.dataset.page;
                 pages.forEach(p => p.classList.toggle('hidden', p.id !== `page-${targetPageId}`));
                 navContainer.querySelectorAll('.nav-button').forEach(btn => btn.classList.remove('active'));
                 button.classList.add('active');
                 
-                // Initialize auction only when the tab is clicked for the first time
                 if (targetPageId === 'gamblers' && !isAuctionInitialized) {
                     initializeAuctionFeature();
                 }
@@ -73,6 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const auctionPageLayout = document.getElementById('auction-page-layout');
         const auctionFormContainer = document.getElementById('auction-form-container');
         const auctionStatusWrapper = auctionStatusContainer.parentElement;
+
 
         const firebaseApp = initializeApp(firebaseConfig);
         const firebaseAuth = getAuth(firebaseApp);
@@ -382,18 +382,33 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             updateUI();
+            
+            // --- NEW: Enable the auction button only after data is ready ---
+            if (auctionNavButton) {
+                auctionNavButton.disabled = false;
+                auctionNavButton.style.cursor = 'pointer';
+            }
         };
 
         (async function main() {
             try {
+                // Disable auction button initially to prevent race condition
+                if(auctionNavButton) {
+                    auctionNavButton.disabled = true;
+                    auctionNavButton.style.cursor = 'not-allowed';
+                }
+
                 const [configResponse, picksResponse] = await Promise.all([ fetch('/config.json'), fetch('/picks.json') ]);
                 if (!configResponse.ok || !picksResponse.ok) throw new Error('Failed to load initial config files.');
                 const configData = await configResponse.json();
                 gamblerPicks = await picksResponse.json();
                 availableGamblers = configData.gamblers;
                 tournamentConfig = configData.tournament;
+                
+                // Fetch data once on load, then enable auction and set interval
                 await fetchLeaderboardData(); 
                 setInterval(fetchLeaderboardData, 60000);
+
             } catch (error) {
                 console.error("Initialization failed:", error);
                 if (gamblersContainer) gamblersContainer.innerHTML = `<p style="color: #d9534f; font-weight: bold;">Error: ${error.message}</p>`;
