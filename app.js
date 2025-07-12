@@ -194,8 +194,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         statusIndicator.textContent = 'Active'; 
                         statusIndicator.style.backgroundColor = 'var(--status-green)'; 
                         activeView.classList.remove('hidden'); 
-                        // --- NEW LOGIC ---
-                        // Hide the status board wrapper and center the form
+                        // Hide status board and center form
                         if (auctionStatusWrapper) auctionStatusWrapper.classList.add('hidden');
                         if (auctionPageLayout) auctionPageLayout.style.gridTemplateColumns = '1fr';
                         if (auctionFormContainer) {
@@ -222,6 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 populateDropdown(playerSelect, playersForDropdown, 'Select a Player', true);
                 submitButton.disabled = false;
                 form.addEventListener('submit', handleFormSubmit);
+                // No need to render status, as it's hidden
             } else if (status === 'finished') {
                 renderFinishedResults(auctionData);
             }
