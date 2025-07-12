@@ -382,8 +382,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             updateUI();
-            
-            // --- NEW: Enable the auction button only after data is ready ---
+
+            // --- THIS IS THE FIX ---
+            // Enable the auction button only after the first successful data fetch.
             if (auctionNavButton) {
                 auctionNavButton.disabled = false;
                 auctionNavButton.style.cursor = 'pointer';
