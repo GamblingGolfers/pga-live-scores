@@ -238,7 +238,7 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 await signInAnonymously(firebaseAuth);
                 if (allPlayersData.length === 0) {
-                    setPageError('Player data is not yet available. Please refresh the page.');
+                    setPageError('Player data is not available. Please check the Leaderboard page first.');
                     return;
                 }
                 const configResponse = await fetch('/config.json');
@@ -340,18 +340,21 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         const fetchPlayerData = async (config) => {
+            // --- NEW: Simplified and corrected data source logic ---
             if (config.playerDataSource === 'provisional') {
                 console.log("Using provisional player list from config.");
                 const response = await fetch('/provisional_players.json');
                 if (!response.ok) throw new Error("Could not load provisional_players.json");
                 const provisionalData = await response.json();
+                // Map provisional data to the structure the app expects
                 return provisionalData.map((player, index) => ({
-                    playerId: `${player.lastName.toLowerCase()}_${player.firstName.toLowerCase()}_${index}`,
+                    playerId: `${player.lastName.toLowerCase()}_${player.firstName.toLowerCase()}_${index}`.replace(/\s/g, ''),
                     firstName: player.firstName,
                     lastName: player.lastName,
                     status: 'active', total: 'E', currentRoundScore: 'E', thru: '-', rounds: []
                 }));
             } else {
+                // Default to API if not set to provisional
                 console.log("Fetching live player data from API.");
                 const url = `/.netlify/functions/get-scores?orgId=${config.tournament.orgId}&tournId=${config.tournament.tournId}&year=${config.tournament.year}`;
                 const response = await fetch(url);
@@ -376,6 +379,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 allPlayersData = await fetchPlayerData(configData);
                 updateUI();
                 
+                // Only set the interval for the live API source
                 if (configData.playerDataSource === 'api') {
                      setInterval(() => fetchPlayerData(configData).then(updateUI), 60000);
                 }
