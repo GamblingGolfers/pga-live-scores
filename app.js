@@ -14,9 +14,13 @@ document.addEventListener('DOMContentLoaded', () => {
     let allPlayersData = [];
     let isAuctionInitialized = false;
 
-    // --- NAVIGATION ---
+    // --- DOM ELEMENTS ---
     const navContainer = document.getElementById('nav-container');
     const pages = document.querySelectorAll('.page');
+    const leaderboardBody = document.getElementById('leaderboard-body');
+    const gamblersContainer = document.getElementById('gamblers-container');
+
+    // --- NAVIGATION ---
     if (navContainer) {
         navContainer.addEventListener('click', (e) => {
             const button = e.target.closest('.nav-button');
@@ -41,9 +45,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const form = document.getElementById('auction-form');
         if (!form) return;
 
-        const MIN_BID_INCREMENT = 5;
-        const ABSOLUTE_MIN_BID = 10;
-        
         const firebaseConfig = {
           apiKey: "AIzaSyCxORo_xPNGACIRk5JryuXvxU4wSzwtdvE",
           authDomain: "gambling-golfers.firebaseapp.com",
@@ -237,7 +238,7 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 await signInAnonymously(firebaseAuth);
                 if (allPlayersData.length === 0) {
-                    setPageError('Player data is not available. Please check the Leaderboard page first.');
+                    setPageError('Player data is not yet available. Please refresh the page.');
                     return;
                 }
                 const configResponse = await fetch('/config.json');
@@ -264,9 +265,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- LEADERBOARD & MAIN APP LOGIC ---
     (() => {
-        const leaderboardBody = document.getElementById('leaderboard-body');
-        const gamblersContainer = document.getElementById('gamblers-container');
-
         const parseScore = (score) => {
             if (typeof score !== 'string' || score.toUpperCase() === 'E' || !score) return 0;
             const number = parseInt(score, 10);
@@ -378,7 +376,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 allPlayersData = await fetchPlayerData(configData);
                 updateUI();
                 
-                // Only set the interval for the live API source
                 if (configData.playerDataSource === 'api') {
                      setInterval(() => fetchPlayerData(configData).then(updateUI), 60000);
                 }
