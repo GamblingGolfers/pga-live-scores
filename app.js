@@ -3,7 +3,7 @@
 // Import Firebase modules first
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, arrayUnion, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getFirestore, collection, doc, getDoc, setDoc, updateDoc, arrayUnion, onSnapshot, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 document.addEventListener('DOMContentLoaded', () => {
     
@@ -14,16 +14,22 @@ document.addEventListener('DOMContentLoaded', () => {
     let allPlayersData = [];
     let isAuctionInitialized = false;
 
-    // --- NAVIGATION ---
+    // --- DOM ELEMENTS ---
     const navContainer = document.getElementById('nav-container');
     const pages = document.querySelectorAll('.page');
+    const leaderboardBody = document.getElementById('leaderboard-body');
+    const gamblersContainer = document.getElementById('gamblers-container');
+
+    // --- NAVIGATION ---
     if (navContainer) {
         navContainer.addEventListener('click', (e) => {
-            if (e.target.classList.contains('nav-button')) {
-                const targetPageId = e.target.dataset.page;
+            const button = e.target.closest('.nav-button');
+            if (button) {
+                const targetPageId = button.dataset.page;
                 pages.forEach(p => p.classList.toggle('hidden', p.id !== `page-${targetPageId}`));
                 navContainer.querySelectorAll('.nav-button').forEach(btn => btn.classList.remove('active'));
-                e.target.classList.add('active');
+                button.classList.add('active');
+                
                 if (targetPageId === 'gamblers' && !isAuctionInitialized) {
                     initializeAuctionFeature();
                 }
@@ -64,6 +70,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const auctionStatusContainer = document.getElementById('auction-status-container');
         const auctionResultsContainer = document.getElementById('auction-results-container');
         const statusIndicator = document.getElementById('auction-status-indicator');
+        const auctionPageLayout = document.getElementById('auction-page-layout');
+        const auctionFormContainer = document.getElementById('auction-form-container');
+        const auctionStatusWrapper = auctionStatusContainer.parentElement;
+
 
         const firebaseApp = initializeApp(firebaseConfig);
         const firebaseAuth = getAuth(firebaseApp);
@@ -87,64 +97,62 @@ document.addEventListener('DOMContentLoaded', () => {
             select.disabled = false;
         };
         
-        const renderAuctionStatus = (auctionData) => {
-            const playersWithBids = Object.keys(auctionData);
-            auctionStatusContainer.innerHTML = playersWithBids.length === 0 
-                ? `<p style="color: var(--text-muted-color);">No bids placed yet. Be the first!</p>`
-                : playersWithBids.sort((a, b) => auctionData[a].playerName.localeCompare(auctionData[b].playerName))
-                  .map(playerId => {
-                    const playerData = auctionData[playerId];
-                    const highestBid = Math.max(...playerData.bids.map(b => b.amount));
-                    return `<div class="auction-card"><div class="player-name">${playerData.playerName}</div><div class="bid-info">Bids Received: <strong>${playerData.bids.length}</strong></div><div class="highest-bid">£${highestBid.toFixed(0)}</div></div>`;
-                  }).join('');
-        };
-        
         const renderFinishedResults = (auctionData) => {
             const playersWithBids = Object.keys(auctionData);
-            auctionResultsContainer.innerHTML = playersWithBids.length === 0
-                ? `<p style="color: var(--text-muted-color);">The auction finished with no bids placed.</p>`
-                : playersWithBids.sort((a, b) => auctionData[a].playerName.localeCompare(auctionData[b].playerName))
-                  .map(playerId => {
-                    const playerData = auctionData[playerId];
-                    const winningBid = playerData.bids.reduce((max, bid) => bid.amount > max.amount ? bid : max);
-                    return `<div class="auction-card"><div class="player-name">${playerData.playerName}</div><div class="bid-info">Winning Bid:</div><div class="highest-bid">£${winningBid.amount.toFixed(0)}</div><div class="winner-name">Won by: ${winningBid.gambler}</div></div>`;
-                  }).join('');
+            auctionResultsContainer.innerHTML = '';
+            if (playersWithBids.length === 0) {
+                auctionResultsContainer.innerHTML = `<p style="color: var(--text-muted-color);">The auction finished with no bids placed.</p>`;
+                return;
+            }
+            const sortedPlayerIds = playersWithBids.sort((a, b) => auctionData[a].playerName.localeCompare(auctionData[b].playerName));
+            sortedPlayerIds.forEach(playerId => {
+                const playerData = auctionData[playerId];
+                const card = document.createElement('div');
+                card.className = 'auction-card';
+                const highestBidAmount = Math.max(...playerData.bids.map(b => b.amount));
+                const topBids = playerData.bids.filter(b => b.amount === highestBidAmount);
+                if (topBids.length > 1) {
+                    const tiedGamblers = topBids.map(b => b.gambler).join(', ');
+                    card.style.borderColor = 'var(--status-orange)';
+                    card.innerHTML = `<div class="player-name">${playerData.playerName}</div><div class="bid-info">Highest Bid (Tied):</div><div class="highest-bid">£${highestBidAmount.toFixed(0)}</div><div class="winner-name" style="color: var(--status-orange);">Tied Bidders: ${tiedGamblers}</div><div class="team-status" style="color: var(--danger-color); margin-top: 10px; border-top: none; font-weight: 700;">REMOVED FROM AUCTION</div>`;
+                } else {
+                    const winningBid = topBids[0];
+                    card.innerHTML = `<div class="player-name">${playerData.playerName}</div><div class="bid-info">Winning Bid:</div><div class="highest-bid">£${winningBid.amount.toFixed(0)}</div><div class="winner-name">Won by: ${winningBid.gambler}</div>`;
+                }
+                auctionResultsContainer.appendChild(card);
+            });
         };
         
         const handleFormSubmit = async (e) => {
             e.preventDefault();
             errorMessageDiv.textContent = '';
-            
             const selectedGambler = gamblerSelect.value;
             const selectedPlayerId = playerSelect.value;
             const bidAmount = parseFloat(bidAmountInput.value);
-
             if (!selectedGambler || !selectedPlayerId || !bidAmountInput.value) {
                 errorMessageDiv.textContent = 'Please select your name, a player, and a bid.'; return;
             }
-            if (isNaN(bidAmount)) {
-                errorMessageDiv.textContent = 'Please enter a valid number for the bid.'; return;
+            if (isNaN(bidAmount) || bidAmount <= 0) {
+                errorMessageDiv.textContent = 'Please enter a valid bid amount.'; return;
             }
-
             submitButton.disabled = true;
             submitButton.textContent = 'Validating...';
-
             try {
+                const allBidsSnapshot = await getDocs(auctionBidsRef);
+                let gamblerBidCount = 0;
+                allBidsSnapshot.forEach(doc => {
+                    doc.data().bids.forEach(bid => {
+                        if (bid.gambler === selectedGambler) gamblerBidCount++;
+                    });
+                });
+                if (gamblerBidCount >= 2) {
+                    throw new Error("You have already placed your maximum of 2 bids.");
+                }
+                submitButton.textContent = 'Placing Bid...';
                 const playerDocRef = doc(db, auctionBidsRef.path, selectedPlayerId);
                 const playerDocSnap = await getDoc(playerDocRef);
                 const playerData = playerDocSnap.exists() ? playerDocSnap.data() : null;
-                const currentHighestBid = playerData ? Math.max(...playerData.bids.map(b => b.amount)) : 0;
-
-                if (currentHighestBid === 0) {
-                    if (bidAmount < ABSOLUTE_MIN_BID) throw new Error(`First bid must be at least £${ABSOLUTE_MIN_BID}.`);
-                } else {
-                    const requiredMinBid = currentHighestBid + MIN_BID_INCREMENT;
-                    if (bidAmount < requiredMinBid) throw new Error(`Bid must be at least £${requiredMinBid}.`);
-                }
-
-                submitButton.textContent = 'Placing Bid...';
                 const newBid = { amount: bidAmount, gambler: selectedGambler, timestamp: Date.now() };
-                
                 if (playerData) {
                     await updateDoc(playerDocRef, { bids: arrayUnion(newBid) });
                 } else {
@@ -163,11 +171,35 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const setupPageByStatus = (status, auctionData) => {
             [activeView, finishedView, notStartedView].forEach(v => v.classList.add('hidden'));
+            if (auctionPageLayout) auctionPageLayout.style.gridTemplateColumns = '';
+            if (auctionFormContainer) {
+                auctionFormContainer.style.maxWidth = '';
+                auctionFormContainer.style.margin = '';
+            }
+            if(auctionStatusWrapper) auctionStatusWrapper.style.display = '';
             if (statusIndicator) {
                  switch (status) {
-                    case 'active': statusIndicator.textContent = 'Active'; statusIndicator.style.backgroundColor = 'var(--status-green)'; activeView.classList.remove('hidden'); break;
-                    case 'finished': statusIndicator.textContent = 'Finished'; statusIndicator.style.backgroundColor = 'var(--status-red)'; finishedView.classList.remove('hidden'); break;
-                    default: statusIndicator.textContent = 'Not Started'; statusIndicator.style.backgroundColor = 'var(--status-orange)'; notStartedView.classList.remove('hidden'); break;
+                    case 'active': 
+                        statusIndicator.textContent = 'Active'; 
+                        statusIndicator.style.backgroundColor = 'var(--status-green)'; 
+                        activeView.classList.remove('hidden'); 
+                        if (auctionStatusWrapper) auctionStatusWrapper.style.display = 'none';
+                        if (auctionPageLayout) auctionPageLayout.style.gridTemplateColumns = '1fr';
+                        if (auctionFormContainer) {
+                            auctionFormContainer.style.maxWidth = '450px';
+                            auctionFormContainer.style.margin = '0 auto';
+                        }
+                        break;
+                    case 'finished': 
+                        statusIndicator.textContent = 'Finished'; 
+                        statusIndicator.style.backgroundColor = 'var(--status-red)'; 
+                        finishedView.classList.remove('hidden'); 
+                        break;
+                    default: 
+                        statusIndicator.textContent = 'Not Started'; 
+                        statusIndicator.style.backgroundColor = 'var(--status-orange)'; 
+                        notStartedView.classList.remove('hidden'); 
+                        break;
                 }
             }
             if (status === 'active') {
@@ -176,92 +208,58 @@ document.addEventListener('DOMContentLoaded', () => {
                 populateDropdown(playerSelect, playersForDropdown, 'Select a Player', true);
                 submitButton.disabled = false;
                 form.addEventListener('submit', handleFormSubmit);
-                renderAuctionStatus(auctionData);
             } else if (status === 'finished') {
                 renderFinishedResults(auctionData);
             }
         };
 
         const resetAuction = async () => {
-            console.log("Resetting auction data...");
             const querySnapshot = await getDocs(auctionBidsRef);
             const deletePromises = [];
-            querySnapshot.forEach((doc) => {
-                deletePromises.push(deleteDoc(doc.ref));
-            });
+            querySnapshot.forEach((doc) => deletePromises.push(deleteDoc(doc.ref)));
             await Promise.all(deletePromises);
-            console.log("Auction data reset successfully.");
         };
 
         const archiveAuction = async () => {
-             console.log("Archiving auction data...");
              const bidsSnapshot = await getDocs(auctionBidsRef);
-             if (bidsSnapshot.empty) {
-                 console.log("No bids to archive.");
-                 return;
-             }
-             
+             if (bidsSnapshot.empty) return;
              const auctionData = {};
-             bidsSnapshot.forEach(doc => {
-                 auctionData[doc.id] = doc.data();
-             });
-             
+             bidsSnapshot.forEach(doc => { auctionData[doc.id] = doc.data(); });
              const results = {};
              for (const playerId in auctionData) {
                  const playerData = auctionData[playerId];
                  if (playerData.bids && playerData.bids.length > 0) {
                      const winningBid = playerData.bids.reduce((max, bid) => bid.amount > max.amount ? bid : max);
-                     results[playerId] = {
-                         playerName: playerData.playerName,
-                         winningBid: winningBid.amount,
-                         winner: winningBid.gambler
-                     };
+                     results[playerId] = { playerName: playerData.playerName, winningBid: winningBid.amount, winner: winningBid.gambler };
                  }
              }
-             
              const archiveId = new Date().toISOString();
              const archiveDocRef = doc(auctionArchivesRef, archiveId);
-             await setDoc(archiveDocRef, {
-                 results,
-                 archivedAt: new Date()
-             });
-             console.log(`Auction results archived successfully with ID: ${archiveId}`);
+             await setDoc(archiveDocRef, { results, archivedAt: new Date() });
         };
 
         (async function main() {
             try {
                 await signInAnonymously(firebaseAuth);
-                
                 if (allPlayersData.length === 0) {
-                    setPageError('Player data is not yet available. Please refresh if the leaderboard has loaded.');
+                    setPageError('Player data is not yet available. Please refresh the page.');
                     return;
                 }
-                
                 const configResponse = await fetch('/config.json');
                 const configData = await configResponse.json();
                 const currentStatus = configData.auctionStatus || 'not_started';
-
-                // --- NEW: State Change Logic ---
                 const PREVIOUS_STATUS_KEY = 'dgg_last_auction_status';
                 const lastKnownStatus = localStorage.getItem(PREVIOUS_STATUS_KEY);
-
                 if (lastKnownStatus && lastKnownStatus !== currentStatus) {
-                    console.log(`Status changed from ${lastKnownStatus} to ${currentStatus}`);
-                    if (currentStatus === 'finished' && lastKnownStatus === 'active') {
-                        await archiveAuction();
-                    } else if (currentStatus === 'active' && lastKnownStatus === 'finished') {
-                        await resetAuction();
-                    }
+                    if (currentStatus === 'finished' && lastKnownStatus === 'active') await archiveAuction();
+                    else if (currentStatus === 'active' && lastKnownStatus === 'finished') await resetAuction();
                 }
                 localStorage.setItem(PREVIOUS_STATUS_KEY, currentStatus);
-                // --- END: State Change Logic ---
-
                 onSnapshot(auctionBidsRef, (snapshot) => {
                     const auctionData = {};
                     snapshot.forEach(doc => { auctionData[doc.id] = doc.data(); });
                     setupPageByStatus(currentStatus, auctionData);
                 });
-
             } catch (error) {
                 console.error("Auction Initialization failed:", error);
                 setPageError(`Auction Initialization failed: ${error.message}`);
@@ -269,11 +267,8 @@ document.addEventListener('DOMContentLoaded', () => {
         })();
     };
 
-    // --- LEADERBOARD LOGIC (Original) ---
+    // --- LEADERBOARD & MAIN APP LOGIC ---
     (() => {
-        const leaderboardBody = document.getElementById('leaderboard-body');
-        const gamblersContainer = document.getElementById('gamblers-container');
-
         const parseScore = (score) => {
             if (typeof score !== 'string' || score.toUpperCase() === 'E' || !score) return 0;
             const number = parseInt(score, 10);
@@ -348,19 +343,29 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
-        const fetchLeaderboardData = () => {
-            const { orgId, tournId, year } = tournamentConfig;
-            const url = `/.netlify/functions/get-scores?orgId=${orgId}&tournId=${tournId}&year=${year}`;
-            fetch(url)
-                .then(res => res.ok ? res.json() : Promise.reject(res))
-                .then(data => {
-                    allPlayersData = data.leaderboardRows || [];
-                    updateUI();
-                })
-                .catch(err => {
-                    console.error("Error fetching data:", err);
-                    if (gamblersContainer) gamblersContainer.innerHTML = `<p style="color: #d9534f; font-weight: bold;">Could not load live data.</p>`;
-                });
+        const fetchPlayerData = async (config) => {
+            if (config.playerDataSource === 'provisional') {
+                console.log("Using provisional player list from config.");
+                const response = await fetch('/provisional_players.json');
+                if (!response.ok) throw new Error("Could not load provisional_players.json");
+                const provisionalData = await response.json();
+                return provisionalData.map((player, index) => ({
+                    playerId: `${player.lastName.toLowerCase()}_${player.firstName.toLowerCase()}_${index}`.replace(/\s/g, ''),
+                    firstName: player.firstName,
+                    lastName: player.lastName,
+                    status: 'active', total: 'E', currentRoundScore: 'E', thru: '-', rounds: []
+                }));
+            } else {
+                console.log("Fetching live player data from API.");
+                const url = `/.netlify/functions/get-scores?orgId=${config.tournament.orgId}&tournId=${config.tournament.tournId}&year=${config.tournament.year}`;
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`Live API failed with status: ${response.status}`);
+                const data = await response.json();
+                if (!data.leaderboardRows || data.leaderboardRows.length === 0) {
+                    throw new Error("Live API returned no players.");
+                }
+                return data.leaderboardRows;
+            }
         };
 
         (async function main() {
@@ -371,8 +376,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 gamblerPicks = await picksResponse.json();
                 availableGamblers = configData.gamblers;
                 tournamentConfig = configData.tournament;
-                fetchLeaderboardData();
-                setInterval(fetchLeaderboardData, 60000);
+                
+                allPlayersData = await fetchPlayerData(configData);
+                updateUI();
+                
+                if (configData.playerDataSource === 'api') {
+                     setInterval(() => fetchPlayerData(configData).then(updateUI), 60000);
+                }
+
             } catch (error) {
                 console.error("Initialization failed:", error);
                 if (gamblersContainer) gamblersContainer.innerHTML = `<p style="color: #d9534f; font-weight: bold;">Error: ${error.message}</p>`;
