@@ -21,6 +21,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const gamblersContainer = document.getElementById('gamblers-container');
     const auctionNavButton = document.querySelector('.nav-button[data-page="gamblers"]');
 
+    // --- FIREBASE SETUP (GLOBAL) ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyCxORo_xPNGACIRk5JryuXvxU4wSzwtdvE",
+      authDomain: "gambling-golfers.firebaseapp.com",
+      projectId: "gambling-golfers",
+      storageBucket: "gambling-golfers.appspot.com",
+      messagingSenderId: "76662537222",
+      appId: "1:76662537222:web:1e9edf0158827a49ab5787",
+      measurementId: "G-WMR6147S63"
+    };
+    const appId = 'dgg-auction-final';
+    const firebaseApp = initializeApp(firebaseConfig);
+    const firebaseAuth = getAuth(firebaseApp);
+    const db = getFirestore(firebaseApp);
+    const auctionBidsRef = collection(db, `/artifacts/${appId}/public/data/auctionBids`);
+    const auctionArchivesRef = collection(db, `/artifacts/${appId}/public/data/auctionArchives`);
+
     // --- NAVIGATION ---
     if (navContainer) {
         navContainer.addEventListener('click', (e) => {
@@ -46,17 +63,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const form = document.getElementById('auction-form');
         if (!form) return;
 
-        const firebaseConfig = {
-          apiKey: "AIzaSyCxORo_xPNGACIRk5JryuXvxU4wSzwtdvE",
-          authDomain: "gambling-golfers.firebaseapp.com",
-          projectId: "gambling-golfers",
-          storageBucket: "gambling-golfers.appspot.com",
-          messagingSenderId: "76662537222",
-          appId: "1:76662537222:web:1e9edf0158827a49ab5787",
-          measurementId: "G-WMR6147S63"
-        };
-        const appId = 'dgg-auction-final';
-
         const activeView = document.getElementById('auction-active-view');
         const finishedView = document.getElementById('auction-finished-view');
         const notStartedView = document.getElementById('auction-not-started-view');
@@ -71,12 +77,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const auctionPageLayout = document.getElementById('auction-page-layout');
         const auctionFormContainer = document.getElementById('auction-form-container');
         const auctionStatusWrapper = auctionStatusContainer.parentElement;
-
-        const firebaseApp = initializeApp(firebaseConfig);
-        const firebaseAuth = getAuth(firebaseApp);
-        const db = getFirestore(firebaseApp);
-        const auctionBidsRef = collection(db, `/artifacts/${appId}/public/data/auctionBids`);
-        const auctionArchivesRef = collection(db, `/artifacts/${appId}/public/data/auctionArchives`);
 
         const setPageError = (message) => {
             const pageDiv = document.getElementById('page-gamblers');
@@ -94,7 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
             select.disabled = false;
         };
         
-        const renderFinishedResults = (auctionData, localPlayers) => {
+        const renderFinishedResults = (auctionData) => {
             const playersWithBids = Object.keys(auctionData);
             auctionResultsContainer.innerHTML = '';
             if (playersWithBids.length === 0) {
@@ -120,7 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         };
         
-        const handleFormSubmit = async (e, localPlayers) => {
+        const handleFormSubmit = async (e) => {
             e.preventDefault();
             errorMessageDiv.textContent = '';
             const selectedGambler = gamblerSelect.value;
@@ -153,8 +153,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (playerData) {
                     await updateDoc(playerDocRef, { bids: arrayUnion(newBid) });
                 } else {
-                    const playerInfo = localPlayers.find(p => p.id === selectedPlayerId);
-                    const name = playerInfo ? playerInfo.name : 'Unknown Player';
+                    const playerInfo = allPlayersData.find(p => p.playerId === selectedPlayerId);
+                    const name = playerInfo ? `${playerInfo.firstName} ${playerInfo.lastName}` : 'Unknown Player';
                     await setDoc(playerDocRef, { playerName: name, bids: [newBid] });
                 }
                 form.reset();
@@ -166,7 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
         
-        const setupPageByStatus = (status, auctionData, localPlayers) => {
+        const setupPageByStatus = (status, auctionData) => {
             [activeView, finishedView, notStartedView].forEach(v => v.classList.add('hidden'));
             if (auctionPageLayout) auctionPageLayout.style.gridTemplateColumns = '';
             if (auctionFormContainer) {
@@ -200,35 +200,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             if (status === 'active') {
+                const playersForDropdown = allPlayersData.map(p => ({ id: p.playerId, name: `${p.firstName} ${p.lastName}` })).sort((a,b) => a.name.localeCompare(b.name));
                 populateDropdown(gamblerSelect, availableGamblers, 'Select Your Name');
-                populateDropdown(playerSelect, localPlayers, 'Select a Player', true);
+                populateDropdown(playerSelect, playersForDropdown, 'Select a Player', true);
                 submitButton.disabled = false;
-                form.addEventListener('submit', (e) => handleFormSubmit(e, localPlayers));
+                form.addEventListener('submit', handleFormSubmit);
             } else if (status === 'finished') {
-                renderFinishedResults(auctionData, localPlayers);
+                renderFinishedResults(auctionData);
             }
         };
 
         (async function main() {
             try {
                 await signInAnonymously(firebaseAuth);
-                
-                // --- NEW: Fetch provisional data directly for the auction ---
-                const provisionalResponse = await fetch('/provisional_players.json');
-                if (!provisionalResponse.ok) throw new Error("Could not load provisional_players.json");
-                const provisionalData = await provisionalResponse.json();
-                
-                const auctionPlayers = provisionalData.map((player, index) => ({
-                    id: `${player.lastName.toLowerCase()}_${player.firstName.toLowerCase()}_${index}`.replace(/\s/g, ''),
-                    name: `${player.firstName} ${player.lastName}`
-                })).sort((a,b) => a.name.localeCompare(b.name));
-                // --- END NEW ---
-
-                if (auctionPlayers.length === 0) {
-                    setPageError('Provisional player list is empty.');
+                if (allPlayersData.length === 0) {
+                    setPageError('Player data is not yet available.');
                     return;
                 }
-                
                 const configResponse = await fetch('/config.json');
                 const configData = await configResponse.json();
                 const currentStatus = configData.auctionStatus || 'not_started';
@@ -236,9 +224,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 onSnapshot(auctionBidsRef, (snapshot) => {
                     const auctionData = {};
                     snapshot.forEach(doc => { auctionData[doc.id] = doc.data(); });
-                    setupPageByStatus(currentStatus, auctionData, auctionPlayers);
+                    setupPageByStatus(currentStatus, auctionData);
                 });
-
             } catch (error) {
                 console.error("Auction Initialization failed:", error);
                 setPageError(`Auction Initialization failed: ${error.message}`);
@@ -246,8 +233,109 @@ document.addEventListener('DOMContentLoaded', () => {
         })();
     };
 
-    // --- LEADERBOARD LOGIC (Original) ---
-    (() => {
+    // --- LEADERBOARD & MAIN APP LOGIC ---
+    (async function main() {
+        try {
+            // --- THIS IS THE CRITICAL FIX ---
+            // The entire application logic now runs inside this single main function,
+            // guaranteeing the correct order of operations.
+
+            // 1. Fetch config files first.
+            const [configResponse, picksResponse] = await Promise.all([ fetch('/config.json'), fetch('/picks.json') ]);
+            if (!configResponse.ok || !picksResponse.ok) throw new Error('Failed to load initial config files.');
+            const configData = await configResponse.json();
+            gamblerPicks = await picksResponse.json();
+            availableGamblers = configData.gamblers;
+            tournamentConfig = configData.tournament;
+
+            // 2. Check and handle auction state changes (reset/archive)
+            const currentStatus = configData.auctionStatus || 'not_started';
+            const PREVIOUS_STATUS_KEY = 'dgg_last_auction_status';
+            const lastKnownStatus = localStorage.getItem(PREVIOUS_STATUS_KEY);
+
+            const resetAuction = async () => {
+                const querySnapshot = await getDocs(auctionBidsRef);
+                const deletePromises = [];
+                querySnapshot.forEach((doc) => deletePromises.push(deleteDoc(doc.ref)));
+                await Promise.all(deletePromises);
+                console.log("Auction data has been reset.");
+            };
+
+            const archiveAuction = async () => {
+                const bidsSnapshot = await getDocs(auctionBidsRef);
+                if (bidsSnapshot.empty) return;
+                const auctionData = {};
+                bidsSnapshot.forEach(doc => { auctionData[doc.id] = doc.data(); });
+                const results = {};
+                for (const playerId in auctionData) {
+                    const playerData = auctionData[playerId];
+                    if (playerData.bids && playerData.bids.length > 0) {
+                        const winningBid = playerData.bids.reduce((max, bid) => bid.amount > max.amount ? bid : max);
+                        results[playerId] = { playerName: playerData.playerName, winningBid: winningBid.amount, winner: winningBid.gambler };
+                    }
+                }
+                const archiveId = new Date().toISOString();
+                const archiveDocRef = doc(auctionArchivesRef, archiveId);
+                await setDoc(archiveDocRef, { results, archivedAt: new Date() });
+                console.log(`Auction results archived successfully.`);
+            };
+
+            if (lastKnownStatus && lastKnownStatus !== currentStatus) {
+                console.log(`Status changed from ${lastKnownStatus} to ${currentStatus}`);
+                if (currentStatus === 'finished' && lastKnownStatus === 'active') await archiveAuction();
+                else if (currentStatus === 'active' && lastKnownStatus === 'finished') await resetAuction();
+            }
+            localStorage.setItem(PREVIOUS_STATUS_KEY, currentStatus);
+
+
+            // 3. Define the player data fetching logic based on config
+            const fetchPlayerData = async () => {
+                if (configData.playerDataSource === 'provisional') {
+                    console.log("Using provisional player list from config.");
+                    const response = await fetch('/provisional_players.json');
+                    if (!response.ok) throw new Error("Could not load provisional_players.json");
+                    const provisionalData = await response.json();
+                    return provisionalData.map((player, index) => ({
+                        playerId: `${player.lastName.toLowerCase()}_${player.firstName.toLowerCase()}_${index}`.replace(/\s/g, ''),
+                        firstName: player.firstName,
+                        lastName: player.lastName,
+                        status: 'active', total: 'E', currentRoundScore: 'E', thru: '-', rounds: []
+                    }));
+                } else {
+                    console.log("Fetching live player data from API.");
+                    const url = `/.netlify/functions/get-scores?orgId=${tournamentConfig.orgId}&tournId=${tournamentConfig.tournId}&year=${tournamentConfig.year}`;
+                    const response = await fetch(url);
+                    if (!response.ok) throw new Error(`Live API failed with status: ${response.status}`);
+                    const data = await response.json();
+                    if (!data.leaderboardRows || data.leaderboardRows.length === 0) {
+                        throw new Error("Live API returned no players.");
+                    }
+                    return data.leaderboardRows;
+                }
+            };
+
+            // 4. Fetch player data
+            allPlayersData = await fetchPlayerData();
+
+            // 5. Now that all data is loaded, build the UI
+            updateLeaderboardUI();
+            
+            // 6. Set up interval for live API if needed
+            if (configData.playerDataSource === 'api') {
+                 setInterval(async () => {
+                    allPlayersData = await fetchPlayerData();
+                    updateLeaderboardUI();
+                 }, 60000);
+            }
+
+        } catch (error) {
+            console.error("Initialization failed:", error);
+            if (gamblersContainer) gamblersContainer.innerHTML = `<p style="color: #d9534f; font-weight: bold;">Error: ${error.message}</p>`;
+            if (leaderboardBody) leaderboardBody.innerHTML = `<tr><td colspan="7"><strong>Error:</strong> ${error.message}</td></tr>`;
+        }
+    })();
+
+    const updateLeaderboardUI = () => {
         const parseScore = (score) => {
             if (typeof score !== 'string' || score.toUpperCase() === 'E' || !score) return 0;
             const number = parseInt(score, 10);
@@ -260,106 +348,64 @@ document.addEventListener('DOMContentLoaded', () => {
             return { text: score.toString(), className: 'score-under' };
         };
 
-        const updateUI = () => {
-            const gamblerData = {};
-            availableGamblers.forEach(gambler => {
-                gamblerData[gambler] = { totalScore: 0, todayScore: 0, players: [], hasMissedCutPlayer: false, missedCutCount: 0, totalPicks: 0 };
-            });
-            allPlayersData.forEach(player => {
-                if (!player || !player.playerId) return;
-                const isOutOfTournament = player.status === 'cut' || player.status === 'wd';
-                const parsedPlayerScore = parseScore(player.total);
-                const parsedTodayScore = parseScore(player.currentRoundScore);
-                const tagsForPlayer = gamblerPicks[player.playerId] || [];
-                tagsForPlayer.forEach(gamblerName => {
-                    const gambler = gamblerData[gamblerName];
-                    if (gambler) {
-                        gambler.totalPicks++;
-                        if (isOutOfTournament) {
-                            gambler.hasMissedCutPlayer = true;
-                            gambler.missedCutCount++;
-                        } else {
-                            gambler.totalScore += parsedPlayerScore;
-                            gambler.todayScore += parsedTodayScore;
-                        }
-                        gambler.players.push({ name: `${player.firstName.charAt(0)}. ${player.lastName}`, score: parsedPlayerScore, hasMissedCut: isOutOfTournament });
+        const gamblerData = {};
+        availableGamblers.forEach(gambler => {
+            gamblerData[gambler] = { totalScore: 0, todayScore: 0, players: [], hasMissedCutPlayer: false, missedCutCount: 0, totalPicks: 0 };
+        });
+        allPlayersData.forEach(player => {
+            if (!player || !player.playerId) return;
+            const isOutOfTournament = player.status === 'cut' || player.status === 'wd';
+            const parsedPlayerScore = parseScore(player.total);
+            const parsedTodayScore = parseScore(player.currentRoundScore);
+            const tagsForPlayer = gamblerPicks[player.playerId] || [];
+            tagsForPlayer.forEach(gamblerName => {
+                const gambler = gamblerData[gamblerName];
+                if (gambler) {
+                    gambler.totalPicks++;
+                    if (isOutOfTournament) {
+                        gambler.hasMissedCutPlayer = true;
+                        gambler.missedCutCount++;
+                    } else {
+                        gambler.totalScore += parsedPlayerScore;
+                        gambler.todayScore += parsedTodayScore;
                     }
-                });
+                    gambler.players.push({ name: `${player.firstName.charAt(0)}. ${player.lastName}`, score: parsedPlayerScore, hasMissedCut: isOutOfTournament });
+                }
             });
-            const sortedGamblers = Object.entries(gamblerData).sort((a, b) => {
-                const gamblerA = a[1]; const gamblerB = b[1];
-                if (gamblerA.hasMissedCutPlayer && !gamblerB.hasMissedCutPlayer) return 1;
-                if (!gamblerA.hasMissedCutPlayer && gamblerB.hasMissedCutPlayer) return -1;
-                return gamblerA.totalScore - gamblerB.totalScore;
+        });
+        const sortedGamblers = Object.entries(gamblerData).sort((a, b) => {
+            const gamblerA = a[1]; const gamblerB = b[1];
+            if (gamblerA.hasMissedCutPlayer && !gamblerB.hasMissedCutPlayer) return 1;
+            if (!gamblerA.hasMissedCutPlayer && gamblerB.hasMissedCutPlayer) return -1;
+            return gamblerA.totalScore - gamblerB.totalScore;
+        });
+        if (gamblersContainer) {
+            gamblersContainer.innerHTML = '';
+            sortedGamblers.forEach(([gamblerName, gamblerInfo]) => {
+                const card = document.createElement('div');
+                card.className = 'gambler-card';
+                let finalScore = gamblerInfo.hasMissedCutPlayer ? { text: formatScore(gamblerInfo.totalScore).text, className: 'score-over' } : formatScore(gamblerInfo.totalScore);
+                const todayScoreInfo = formatScore(gamblerInfo.todayScore);
+                const madeCutCount = gamblerInfo.totalPicks - gamblerInfo.missedCutCount;
+                const teamStatusText = `${madeCutCount}/${gamblerInfo.totalPicks} MADE CUT`;
+                const playerBreakdownHtml = gamblerInfo.players.map(p => `<div class="player-row ${p.hasMissedCut ? 'missed-cut' : ''}"><span class="player-name">${p.name}</span><span class="player-score ${formatScore(p.score).className}">${formatScore(p.score).text}${p.hasMissedCut ? ' (MC)' : ''}</span></div>`).join('');
+                card.innerHTML = `<div class="name">${gamblerName}</div><div class="total-score ${finalScore.className}">${finalScore.text}</div><div class="today-score ${todayScoreInfo.className}">Today: ${todayScoreInfo.text}</div><div class="team-status">${teamStatusText}</div><div class="player-breakdown">${playerBreakdownHtml}</div>`;
+                gamblersContainer.appendChild(card);
             });
-            if (gamblersContainer) {
-                gamblersContainer.innerHTML = '';
-                sortedGamblers.forEach(([gamblerName, gamblerInfo]) => {
-                    const card = document.createElement('div');
-                    card.className = 'gambler-card';
-                    let finalScore = gamblerInfo.hasMissedCutPlayer ? { text: formatScore(gamblerInfo.totalScore).text, className: 'score-over' } : formatScore(gamblerInfo.totalScore);
-                    const todayScoreInfo = formatScore(gamblerInfo.todayScore);
-                    const madeCutCount = gamblerInfo.totalPicks - gamblerInfo.missedCutCount;
-                    const teamStatusText = `${madeCutCount}/${gamblerInfo.totalPicks} MADE CUT`;
-                    const playerBreakdownHtml = gamblerInfo.players.map(p => `<div class="player-row ${p.hasMissedCut ? 'missed-cut' : ''}"><span class="player-name">${p.name}</span><span class="player-score ${formatScore(p.score).className}">${formatScore(p.score).text}${p.hasMissedCut ? ' (MC)' : ''}</span></div>`).join('');
-                    card.innerHTML = `<div class="name">${gamblerName}</div><div class="total-score ${finalScore.className}">${finalScore.text}</div><div class="today-score ${todayScoreInfo.className}">Today: ${todayScoreInfo.text}</div><div class="team-status">${teamStatusText}</div><div class="player-breakdown">${playerBreakdownHtml}</div>`;
-                    gamblersContainer.appendChild(card);
-                });
-            }
-            if (leaderboardBody) {
-                leaderboardBody.innerHTML = allPlayersData.map(player => {
-                    if (!player || !player.playerId) return '';
-                    const tagsHtml = (gamblerPicks[player.playerId] || []).map(tag => `<span class="tag">${tag}</span>`).join('');
-                    const totalScoreInfo = formatScore(parseScore(player.total));
-                    const todayScoreInfo = formatScore(parseScore(player.currentRoundScore));
-                    let lastRound = 'N/A';
-                    if (player.rounds && player.rounds.length > 0) {
-                        const lastRoundData = player.rounds[player.rounds.length - 1];
-                        if (lastRoundData && lastRoundData.strokes && lastRoundData.strokes['$numberInt']) lastRound = lastRoundData.strokes['$numberInt'];
-                    }
-                    return `<tr><td>${tagsHtml}</td><td>${player.position || 'N/A'}</td><td>${player.firstName || ''} ${player.lastName || ''}</td><td class="${totalScoreInfo.className}">${totalScoreInfo.text}</td><td class="${todayScoreInfo.className}">${todayScoreInfo.text}</td><td>${player.thru || 'N/A'}</td><td>${lastRound}</td></tr>`;
-                }).join('');
-            }
-        };
-
-        const fetchPlayerData = async (config) => {
-            // This is the original API fetch logic, it remains unchanged
-            console.log("Fetching live player data from API for Leaderboard.");
-            const url = `/.netlify/functions/get-scores?orgId=${config.tournament.orgId}&tournId=${config.tournament.tournId}&year=${config.tournament.year}`;
-            const response = await fetch(url);
-            if (!response.ok) {
-                // If API fails, we don't use a fallback for the leaderboard page to avoid confusion
-                throw new Error(`Live API failed with status: ${response.status}`);
-            }
-            const data = await response.json();
-            if (!data.leaderboardRows || data.leaderboardRows.length === 0) {
-                throw new Error("Live API returned no players.");
-            }
-            return data.leaderboardRows;
-        };
-
-        (async function main() {
-            try {
-                const [configResponse, picksResponse] = await Promise.all([ fetch('/config.json'), fetch('/picks.json') ]);
-                if (!configResponse.ok || !picksResponse.ok) throw new Error('Failed to load initial config files.');
-                const configData = await configResponse.json();
-                gamblerPicks = await picksResponse.json();
-                availableGamblers = configData.gamblers;
-                tournamentConfig = configData.tournament;
-                
-                allPlayersData = await fetchPlayerData(configData);
-                updateUI();
-                
-                setInterval(async () => {
-                    allPlayersData = await fetchPlayerData(configData);
-                    updateUI();
-                }, 60000);
-
-            } catch (error) {
-                console.error("Initialization failed:", error);
-                if (gamblersContainer) gamblersContainer.innerHTML = `<p style="color: #d9534f; font-weight: bold;">Error: ${error.message}</p>`;
-                if (leaderboardBody) leaderboardBody.innerHTML = `<tr><td colspan="7"><strong>Error:</strong> ${error.message}</td></tr>`;
-            }
-        })();
-    })();
+        }
+        if (leaderboardBody) {
+            leaderboardBody.innerHTML = allPlayersData.map(player => {
+                if (!player || !player.playerId) return '';
+                const tagsHtml = (gamblerPicks[player.playerId] || []).map(tag => `<span class="tag">${tag}</span>`).join('');
+                const totalScoreInfo = formatScore(parseScore(player.total));
+                const todayScoreInfo = formatScore(parseScore(player.currentRoundScore));
+                let lastRound = 'N/A';
+                if (player.rounds && player.rounds.length > 0) {
+                    const lastRoundData = player.rounds[player.rounds.length - 1];
+                    if (lastRoundData && lastRoundData.strokes && lastRoundData.strokes['$numberInt']) lastRound = lastRoundData.strokes['$numberInt'];
+                }
+                return `<tr><td>${tagsHtml}</td><td>${player.position || 'N/A'}</td><td>${player.firstName || ''} ${player.lastName || ''}</td><td class="${totalScoreInfo.className}">${totalScoreInfo.text}</td><td class="${todayScoreInfo.className}">${todayScoreInfo.text}</td><td>${player.thru || 'N/A'}</td><td>${lastRound}</td></tr>`;
+            }).join('');
+        }
+    };
 });
