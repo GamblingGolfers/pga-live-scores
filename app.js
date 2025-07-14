@@ -267,6 +267,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- LEADERBOARD & MAIN APP LOGIC ---
     (async function main() {
         try {
+            // Disable auction button initially to prevent race condition
+            if(auctionNavButton) {
+                auctionNavButton.disabled = true;
+            }
+
             // 1. Fetch config files first.
             const [configResponse, picksResponse] = await Promise.all([ fetch('/config.json'), fetch('/picks.json') ]);
             if (!configResponse.ok || !picksResponse.ok) throw new Error('Failed to load initial config files.');
@@ -315,7 +320,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // 6. Set up interval for live API if needed
             if (configData.playerDataSource === 'api') {
                  setInterval(async () => {
-                    allPlayersData = await fetchPlayerData(configData);
+                    allPlayersData = await fetchPlayerData();
                     updateLeaderboardUI();
                  }, 60000);
             }
