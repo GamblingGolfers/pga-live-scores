@@ -21,23 +21,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const gamblersContainer = document.getElementById('gamblers-container');
     const auctionNavButton = document.querySelector('.nav-button[data-page="gamblers"]');
 
-    // --- FIREBASE SETUP (GLOBAL) ---
-    const firebaseConfig = {
-      apiKey: "AIzaSyCxORo_xPNGACIRk5JryuXvxU4wSzwtdvE",
-      authDomain: "gambling-golfers.firebaseapp.com",
-      projectId: "gambling-golfers",
-      storageBucket: "gambling-golfers.appspot.com",
-      messagingSenderId: "76662537222",
-      appId: "1:76662537222:web:1e9edf0158827a49ab5787",
-      measurementId: "G-WMR6147S63"
-    };
-    const appId = 'dgg-auction-final';
-    const firebaseApp = initializeApp(firebaseConfig);
-    const firebaseAuth = getAuth(firebaseApp);
-    const db = getFirestore(firebaseApp);
-    const auctionBidsRef = collection(db, `/artifacts/${appId}/public/data/auctionBids`);
-    const auctionArchivesRef = collection(db, `/artifacts/${appId}/public/data/auctionArchives`);
-
     // --- NAVIGATION ---
     if (navContainer) {
         navContainer.addEventListener('click', (e) => {
@@ -62,6 +45,17 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const form = document.getElementById('auction-form');
         if (!form) return;
+        
+        const firebaseConfig = {
+          apiKey: "AIzaSyCxORo_xPNGACIRk5JryuXvxU4wSzwtdvE",
+          authDomain: "gambling-golfers.firebaseapp.com",
+          projectId: "gambling-golfers",
+          storageBucket: "gambling-golfers.appspot.com",
+          messagingSenderId: "76662537222",
+          appId: "1:76662537222:web:1e9edf0158827a49ab5787",
+          measurementId: "G-WMR6147S63"
+        };
+        const appId = 'dgg-auction-final';
 
         const activeView = document.getElementById('auction-active-view');
         const finishedView = document.getElementById('auction-finished-view');
@@ -77,6 +71,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const auctionPageLayout = document.getElementById('auction-page-layout');
         const auctionFormContainer = document.getElementById('auction-form-container');
         const auctionStatusWrapper = auctionStatusContainer.parentElement;
+
+        const firebaseApp = initializeApp(firebaseConfig);
+        const firebaseAuth = getAuth(firebaseApp);
+        const db = getFirestore(firebaseApp);
+        const auctionBidsRef = collection(db, `/artifacts/${appId}/public/data/auctionBids`);
+        const auctionArchivesRef = collection(db, `/artifacts/${appId}/public/data/auctionArchives`);
 
         const setPageError = (message) => {
             const pageDiv = document.getElementById('page-gamblers');
@@ -135,6 +135,17 @@ document.addEventListener('DOMContentLoaded', () => {
             submitButton.disabled = true;
             submitButton.textContent = 'Validating...';
             try {
+                // --- NEW LOGIC: Check for existing bid on this specific player first ---
+                const playerDocRef = doc(db, auctionBidsRef.path, selectedPlayerId);
+                const playerDocSnap = await getDoc(playerDocRef);
+                if (playerDocSnap.exists()) {
+                    const playerData = playerDocSnap.data();
+                    if (playerData.bids.some(bid => bid.gambler === selectedGambler)) {
+                        throw new Error("You have already placed a bid on this player.");
+                    }
+                }
+                
+                // Now, check the total bid count for the gambler
                 const allBidsSnapshot = await getDocs(auctionBidsRef);
                 let gamblerBidCount = 0;
                 allBidsSnapshot.forEach(doc => {
@@ -145,12 +156,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (gamblerBidCount >= 2) {
                     throw new Error("You have already placed your maximum of 2 bids.");
                 }
+
                 submitButton.textContent = 'Placing Bid...';
-                const playerDocRef = doc(db, auctionBidsRef.path, selectedPlayerId);
-                const playerDocSnap = await getDoc(playerDocRef);
-                const playerData = playerDocSnap.exists() ? playerDocSnap.data() : null;
+                const playerDataOnSubmit = playerDocSnap.exists() ? playerDocSnap.data() : null;
                 const newBid = { amount: bidAmount, gambler: selectedGambler, timestamp: Date.now() };
-                if (playerData) {
+                if (playerDataOnSubmit) {
                     await updateDoc(playerDocRef, { bids: arrayUnion(newBid) });
                 } else {
                     const playerInfo = allPlayersData.find(p => p.playerId === selectedPlayerId);
@@ -210,17 +220,48 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
+        const resetAuction = async () => {
+            const querySnapshot = await getDocs(auctionBidsRef);
+            const deletePromises = [];
+            querySnapshot.forEach((doc) => deletePromises.push(deleteDoc(doc.ref)));
+            await Promise.all(deletePromises);
+        };
+
+        const archiveAuction = async () => {
+             const bidsSnapshot = await getDocs(auctionBidsRef);
+             if (bidsSnapshot.empty) return;
+             const auctionData = {};
+             bidsSnapshot.forEach(doc => { auctionData[doc.id] = doc.data(); });
+             const results = {};
+             for (const playerId in auctionData) {
+                 const playerData = auctionData[playerId];
+                 if (playerData.bids && playerData.bids.length > 0) {
+                     const winningBid = playerData.bids.reduce((max, bid) => bid.amount > max.amount ? bid : max);
+                     results[playerId] = { playerName: playerData.playerName, winningBid: winningBid.amount, winner: winningBid.gambler };
+                 }
+             }
+             const archiveId = new Date().toISOString();
+             const archiveDocRef = doc(auctionArchivesRef, archiveId);
+             await setDoc(archiveDocRef, { results, archivedAt: new Date() });
+        };
+
         (async function main() {
             try {
                 await signInAnonymously(firebaseAuth);
                 if (allPlayersData.length === 0) {
-                    setPageError('Player data is not yet available.');
+                    setPageError('Player data is not yet available. Please refresh the page.');
                     return;
                 }
                 const configResponse = await fetch('/config.json');
                 const configData = await configResponse.json();
                 const currentStatus = configData.auctionStatus || 'not_started';
-                
+                const PREVIOUS_STATUS_KEY = 'dgg_last_auction_status';
+                const lastKnownStatus = localStorage.getItem(PREVIOUS_STATUS_KEY);
+                if (lastKnownStatus && lastKnownStatus !== currentStatus) {
+                    if (currentStatus === 'finished' && lastKnownStatus === 'active') await archiveAuction();
+                    else if (currentStatus === 'active' && lastKnownStatus === 'finished') await resetAuction();
+                }
+                localStorage.setItem(PREVIOUS_STATUS_KEY, currentStatus);
                 onSnapshot(auctionBidsRef, (snapshot) => {
                     const auctionData = {};
                     snapshot.forEach(doc => { auctionData[doc.id] = doc.data(); });
@@ -236,59 +277,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- LEADERBOARD & MAIN APP LOGIC ---
     (async function main() {
         try {
-            // --- THIS IS THE CRITICAL FIX ---
-            // The entire application logic now runs inside this single main function,
-            // guaranteeing the correct order of operations.
-
-            // 1. Fetch config files first.
+            if(auctionNavButton) {
+                auctionNavButton.disabled = true;
+            }
             const [configResponse, picksResponse] = await Promise.all([ fetch('/config.json'), fetch('/picks.json') ]);
             if (!configResponse.ok || !picksResponse.ok) throw new Error('Failed to load initial config files.');
             const configData = await configResponse.json();
             gamblerPicks = await picksResponse.json();
             availableGamblers = configData.gamblers;
             tournamentConfig = configData.tournament;
-
-            // 2. Check and handle auction state changes (reset/archive)
-            const currentStatus = configData.auctionStatus || 'not_started';
-            const PREVIOUS_STATUS_KEY = 'dgg_last_auction_status';
-            const lastKnownStatus = localStorage.getItem(PREVIOUS_STATUS_KEY);
-
-            const resetAuction = async () => {
-                const querySnapshot = await getDocs(auctionBidsRef);
-                const deletePromises = [];
-                querySnapshot.forEach((doc) => deletePromises.push(deleteDoc(doc.ref)));
-                await Promise.all(deletePromises);
-                console.log("Auction data has been reset.");
-            };
-
-            const archiveAuction = async () => {
-                const bidsSnapshot = await getDocs(auctionBidsRef);
-                if (bidsSnapshot.empty) return;
-                const auctionData = {};
-                bidsSnapshot.forEach(doc => { auctionData[doc.id] = doc.data(); });
-                const results = {};
-                for (const playerId in auctionData) {
-                    const playerData = auctionData[playerId];
-                    if (playerData.bids && playerData.bids.length > 0) {
-                        const winningBid = playerData.bids.reduce((max, bid) => bid.amount > max.amount ? bid : max);
-                        results[playerId] = { playerName: playerData.playerName, winningBid: winningBid.amount, winner: winningBid.gambler };
-                    }
-                }
-                const archiveId = new Date().toISOString();
-                const archiveDocRef = doc(auctionArchivesRef, archiveId);
-                await setDoc(archiveDocRef, { results, archivedAt: new Date() });
-                console.log(`Auction results archived successfully.`);
-            };
-
-            if (lastKnownStatus && lastKnownStatus !== currentStatus) {
-                console.log(`Status changed from ${lastKnownStatus} to ${currentStatus}`);
-                if (currentStatus === 'finished' && lastKnownStatus === 'active') await archiveAuction();
-                else if (currentStatus === 'active' && lastKnownStatus === 'finished') await resetAuction();
-            }
-            localStorage.setItem(PREVIOUS_STATUS_KEY, currentStatus);
-
-
-            // 3. Define the player data fetching logic based on config
+            
             const fetchPlayerData = async () => {
                 if (configData.playerDataSource === 'provisional') {
                     console.log("Using provisional player list from config.");
@@ -313,14 +311,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     return data.leaderboardRows;
                 }
             };
-
-            // 4. Fetch player data
+            
             allPlayersData = await fetchPlayerData();
-
-            // 5. Now that all data is loaded, build the UI
             updateLeaderboardUI();
             
-            // 6. Set up interval for live API if needed
+            if (auctionNavButton) {
+                auctionNavButton.disabled = false;
+            }
+            
             if (configData.playerDataSource === 'api') {
                  setInterval(async () => {
                     allPlayersData = await fetchPlayerData();
@@ -391,7 +389,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const playerBreakdownHtml = gamblerInfo.players.map(p => `<div class="player-row ${p.hasMissedCut ? 'missed-cut' : ''}"><span class="player-name">${p.name}</span><span class="player-score ${formatScore(p.score).className}">${formatScore(p.score).text}${p.hasMissedCut ? ' (MC)' : ''}</span></div>`).join('');
                 card.innerHTML = `<div class="name">${gamblerName}</div><div class="total-score ${finalScore.className}">${finalScore.text}</div><div class="today-score ${todayScoreInfo.className}">Today: ${todayScoreInfo.text}</div><div class="team-status">${teamStatusText}</div><div class="player-breakdown">${playerBreakdownHtml}</div>`;
                 gamblersContainer.appendChild(card);
-            });
+            }
         }
         if (leaderboardBody) {
             leaderboardBody.innerHTML = allPlayersData.map(player => {
