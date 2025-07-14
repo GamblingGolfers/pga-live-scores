@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- FINAL, ROBUST CSP: Allows all necessary Google/Firebase domains -->
-    <meta http-equiv="Content-Security-Policy" content="script-src 'self' https://www.gstatic.com; connect-src 'self' https://live-golf-data.p.rapidapi.com https://*.googleapis.com wss://*.firebaseio.com;">
+    <!-- This corrected CSP allows scripts from gstatic.com and connections to firebase -->
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' https://www.gstatic.com; connect-src 'self' https://live-golf-data.p.rapidapi.com wss://*.firebaseio.com;">
     <title>Discriminatory Gamblers - Golf Suite</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -95,7 +95,7 @@
             <h1>Golf Suite</h1>
             <div id="nav-container" class="nav-buttons">
                 <button data-page="leaderboard" class="nav-button active">Leaderboard</button>
-                <button data-page="gamblers" class="nav-button">Silent Auction</button>
+                <button data-page="gamblers" class="nav-button">DG Auction</button>
             </div>
         </header>
 
@@ -114,7 +114,7 @@
 
         <div id="page-gamblers" class="page hidden">
             <div id="auction-title-container">
-                 <h1 id="auction-main-title" style="font-size: 2em; margin-bottom: 20px; text-align: left;">Silent Auction</h1>
+                 <h1 id="auction-main-title" style="font-size: 2em; margin-bottom: 20px; text-align: left;">DG Auction</h1>
                  <span id="auction-status-indicator"></span>
             </div>
             <div id="auction-active-view" class="hidden">
@@ -145,6 +145,7 @@
         </div>
     </div>
     
+    <!-- The single, unified script -->
     <script src="app.js" type="module"></script>
     
 </body>
