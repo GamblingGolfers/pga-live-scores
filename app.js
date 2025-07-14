@@ -1,4 +1,4 @@
-// --- THIS SCRIPT NOW CONTROLS THE ENTIRE APPLICATION ---
+    // --- THIS SCRIPT NOW CONTROLS THE ENTIRE APPLICATION ---
 
 // Import Firebase modules first
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -46,6 +46,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const form = document.getElementById('auction-form');
         if (!form) return;
 
+        const MIN_BID_INCREMENT = 5;
+        const ABSOLUTE_MIN_BID = 10;
+        
         const firebaseConfig = {
           apiKey: "AIzaSyCxORo_xPNGACIRk5JryuXvxU4wSzwtdvE",
           authDomain: "gambling-golfers.firebaseapp.com",
