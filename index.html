@@ -3,8 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- FINAL, ROBUST CSP: Allows all necessary Google/Firebase domains for both auth and database connections -->
-    <meta http-equiv="Content-Security-Policy" content="script-src 'self' https://www.gstatic.com; connect-src 'self' https://live-golf-data.p.rapidapi.com https://*.googleapis.com wss://*.firebaseio.com;">
     <title>Discriminatory Gamblers - Golf Suite</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -100,15 +98,14 @@
         </header>
 
         <div id="page-leaderboard" class="page">
-            <h1 style="display: none;">Discriminatory Gamblers - Golf Tracker</h1>
             <h2>Gamblers' Scores</h2>
-            <div id="gamblers-container"></div>
+            <div id="gamblers-container"><p>Loading Scores...</p></div>
             <h2>The Open Championship 2025 - Leaderboard</h2>
             <table id="leaderboard-table">
                 <thead>
                     <tr><th style="width: 20%;">Gambler</th><th style="width: 10%;">Pos</th><th>Player</th><th style="width: 10%;">Total</th><th style="width: 10%;">Today</th><th style="width: 10%;">Thru</th><th style="width: 10%;">Round</th></tr>
                 </thead>
-                <tbody id="leaderboard-body"></tbody>
+                <tbody id="leaderboard-body"><tr><td colspan="7" style="text-align: center;">Loading Leaderboard...</td></tr></tbody>
             </table>
         </div>
 
@@ -140,11 +137,12 @@
                  <div id="auction-results-container"><p style="color: var(--text-muted-color);">Calculating results...</p></div>
             </div>
              <div id="auction-not-started-view" class="hidden" style="text-align: center; padding: 40px; background: var(--card-color); border-radius: 12px;">
-                 <p>The auction is still running. Please check back later.</p>
+                 <p>The auction has not started yet. Please check back later.</p>
             </div>
         </div>
     </div>
     
+    <!-- The single, reliable entry point for the application -->
     <script src="app.js" type="module"></script>
     
 </body>
