@@ -6,21 +6,37 @@ import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/1
 import { getFirestore, collection, doc, onSnapshot, getDoc, getDocs, setDoc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 document.addEventListener('DOMContentLoaded', () => {
-    
-    // --- SHARED STATE & CONFIG ---
+
+    // --- 1. UNIFIED FIREBASE & APP INITIALIZATION ---
+    const firebaseConfig = {
+        apiKey: "AIzaSyCxORo_xPNGACIRk5JryuXvxU4wSzwtdvE",
+        authDomain: "gambling-golfers.firebaseapp.com",
+        projectId: "gambling-golfers",
+        storageBucket: "gambling-golfers.appspot.com",
+        messagingSenderId: "76662537222",
+        appId: "1:76662537222:web:1e9edf0158827a49ab5787",
+        measurementId: "G-WMR6147S63"
+    };
+    const appId = 'dgg-auction-final';
+
+    const firebaseApp = initializeApp(firebaseConfig);
+    const db = getFirestore(firebaseApp);
+    const firebaseAuth = getAuth(firebaseApp);
+
+    // --- 2. SHARED STATE & CONFIG ---
     let gamblerPicks = {};
     let availableGamblers = [];
     let tournamentConfig = {};
     let allPlayersData = [];
     let isAuctionInitialized = false;
 
-    // --- DOM ELEMENTS ---
+    // --- 3. DOM ELEMENTS ---
     const navContainer = document.getElementById('nav-container');
     const pages = document.querySelectorAll('.page');
     const leaderboardBody = document.getElementById('leaderboard-body');
     const gamblersContainer = document.getElementById('gamblers-container');
 
-    // --- NAVIGATION ---
+    // --- 4. NAVIGATION ---
     if (navContainer) {
         navContainer.addEventListener('click', (e) => {
             const button = e.target.closest('.nav-button');
@@ -37,7 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- AUCTION LOGIC ---
+    // --- 5. AUCTION LOGIC (Defined here, called by navigation) ---
     const initializeAuctionFeature = () => {
         if (isAuctionInitialized) return;
         isAuctionInitialized = true;
@@ -45,19 +61,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const form = document.getElementById('auction-form');
         if (!form) return;
 
-        // --- Firebase Configuration ---
-        const firebaseConfig = {
-          apiKey: "AIzaSyCxORo_xPNGACIRk5JryuXvxU4wSzwtdvE",
-          authDomain: "gambling-golfers.firebaseapp.com",
-          projectId: "gambling-golfers",
-          storageBucket: "gambling-golfers.appspot.com",
-          messagingSenderId: "76662537222",
-          appId: "1:76662537222:web:1e9edf0158827a49ab5787",
-          measurementId: "G-WMR6147S63"
-        };
-        const appId = 'dgg-auction-final';
-
-        // --- Auction DOM Elements ---
         const activeView = document.getElementById('auction-active-view');
         const finishedView = document.getElementById('auction-finished-view');
         const notStartedView = document.getElementById('auction-not-started-view');
@@ -73,16 +76,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const auctionStatusContainer = document.getElementById('auction-status-container');
         const auctionStatusWrapper = auctionStatusContainer ? auctionStatusContainer.parentElement : null;
 
-
-        // --- Firebase Initialization ---
-        const firebaseApp = initializeApp(firebaseConfig);
-        const firebaseAuth = getAuth(firebaseApp);
-        const db = getFirestore(firebaseApp);
-        
-        // --- Firestore References ---
         const auctionBidsRef = collection(db, `/artifacts/${appId}/public/data/auctionBids`);
-        // CORRECTED PATH: Points to a specific document 'currentState' inside the 'auctionState' collection.
-        const auctionStateRef = doc(db, `/artifacts/${appId}/public/data/auctionState/currentState`); 
+        const auctionStateRef = doc(db, `/artifacts/${appId}/public/data/auctionState/currentState`);
 
         const setPageError = (message) => {
             const pageDiv = document.getElementById('page-gamblers');
@@ -218,7 +213,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
-        (async function main() {
+        (async function auctionMain() {
             try {
                 await signInAnonymously(firebaseAuth);
                 
@@ -241,11 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 onSnapshot(auctionStateRef, (stateDoc) => {
                     currentStatus = stateDoc.exists() ? stateDoc.data().status : 'not_started';
-
-                    if (bidsUnsubscribe) {
-                        bidsUnsubscribe();
-                    }
-
+                    if (bidsUnsubscribe) { bidsUnsubscribe(); }
                     bidsUnsubscribe = onSnapshot(auctionBidsRef, (bidsSnapshot) => {
                         const auctionData = {};
                         bidsSnapshot.forEach(doc => { auctionData[doc.id] = doc.data(); });
@@ -258,7 +249,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.error("Error listening to auction state:", error);
                     setPageError("Could not determine auction status.");
                 });
-
             } catch (error) {
                 console.error("Auction Initialization failed:", error);
                 setPageError(`Auction Initialization failed: ${error.message}`);
@@ -266,7 +256,7 @@ document.addEventListener('DOMContentLoaded', () => {
         })();
     };
 
-    // --- LEADERBOARD LOGIC (Original) ---
+    // --- 6. LEADERBOARD LOGIC (Runs immediately on page load) ---
     (() => {
         const parseScore = (score) => {
             if (typeof score !== 'string' || score.toUpperCase() === 'E' || !score) return 0;
@@ -342,23 +332,19 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         const fetchPlayerData = async (config) => {
-            console.log("Fetching live player data from API for Leaderboard.");
             const url = `/.netlify/functions/get-scores?orgId=${config.tournament.orgId}&tournId=${config.tournament.tournId}&year=${config.tournament.year}`;
             const response = await fetch(url);
-            if (!response.ok) {
-                throw new Error(`Live API failed with status: ${response.status}`);
-            }
+            if (!response.ok) throw new Error(`Live API failed with status: ${response.status}`);
             const data = await response.json();
-            if (!data.leaderboardRows || data.leaderboardRows.length === 0) {
-                throw new Error("Live API returned no players.");
-            }
+            if (!data.leaderboardRows || data.leaderboardRows.length === 0) throw new Error("Live API returned no players.");
             return data.leaderboardRows;
         };
 
-        (async function main() {
+        (async function leaderboardMain() {
             try {
                 const [configResponse, picksResponse] = await Promise.all([ fetch('/config.json'), fetch('/picks.json') ]);
                 if (!configResponse.ok || !picksResponse.ok) throw new Error('Failed to load initial config files.');
+                
                 const configData = await configResponse.json();
                 gamblerPicks = await picksResponse.json();
                 availableGamblers = configData.gamblers;
