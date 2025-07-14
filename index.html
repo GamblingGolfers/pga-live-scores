@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="script-src 'self' https://www.gstatic.com; connect-src 'self' https://live-golf-data.p.rapidapi.com wss://*.firebaseio.com;">
+    <!-- FINAL, ROBUST CSP: Allows all necessary Google/Firebase domains for both auth and database connections -->
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' https://www.gstatic.com; connect-src 'self' https://live-golf-data.p.rapidapi.com https://*.googleapis.com wss://*.firebaseio.com;">
     <title>Discriminatory Gamblers - Golf Suite</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -45,7 +46,6 @@
         .nav-button { background: transparent; border: none; color: var(--text-muted-color); font-family: 'Inter', sans-serif; font-weight: 600; font-size: 0.9em; padding: 8px 16px; border-radius: 8px; cursor: pointer; transition: all 0.2s ease; }
         .nav-button.active { background-color: var(--accent-color); color: #fff; box-shadow: 0 0 15px rgba(0, 170, 255, 0.4); }
         .nav-button:not(.active):hover { background-color: var(--hover-color); color: var(--text-color); }
-        .nav-button:disabled { cursor: not-allowed; opacity: 0.5; }
         .page.hidden { display: none; }
         #gamblers-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px; }
         .gambler-card { background: var(--card-color); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); text-align: center; transition: all 0.3s ease; }
@@ -95,7 +95,7 @@
             <h1>Golf Suite</h1>
             <div id="nav-container" class="nav-buttons">
                 <button data-page="leaderboard" class="nav-button active">Leaderboard</button>
-                <button data-page="gamblers" class="nav-button" disabled>DG Auction</button>
+                <button data-page="gamblers" class="nav-button">DG Auction</button>
             </div>
         </header>
 
