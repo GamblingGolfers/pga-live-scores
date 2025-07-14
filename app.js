@@ -1,19 +1,14 @@
-// --- THIS SCRIPT NOW CONTROLS THE ENTIRE APPLICATION (REWRITTEN FOR STABILITY) ---
-
 // --- MODULE IMPORTS ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, collection, doc, onSnapshot, getDoc, getDocs, setDoc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // --- 1. GLOBAL STATE & CONFIGURATION ---
-// Firebase services will be initialized in main()
 let db, auth; 
-// Shared data stores
 let gamblerPicks = {};
 let availableGamblers = [];
 let tournamentConfig = {};
 let allPlayersData = [];
-// State flags
 let isAuctionInitialized = false;
 
 // --- 2. DOM ELEMENT REFERENCES ---
@@ -22,7 +17,7 @@ const pages = document.querySelectorAll('.page');
 const leaderboardBody = document.getElementById('leaderboard-body');
 const gamblersContainer = document.getElementById('gamblers-container');
 
-// --- 3. LEADERBOARD-SPECIFIC FUNCTIONS ---
+// --- 3. LEADERBOARD MODULE ---
 const leaderboard = {
     parseScore(score) {
         if (typeof score !== 'string' || score.toUpperCase() === 'E' || !score) return 0;
@@ -102,12 +97,30 @@ const leaderboard = {
         const data = await response.json();
         if (!data.leaderboardRows || data.leaderboardRows.length === 0) throw new Error("Live API returned no players.");
         return data.leaderboardRows;
+    },
+    async init() {
+        try {
+            allPlayersData = await this.fetchPlayerData(tournamentConfig);
+            this.updateUI();
+            setInterval(async () => {
+                try {
+                    allPlayersData = await this.fetchPlayerData(tournamentConfig);
+                    this.updateUI();
+                } catch (error) {
+                    console.error("Periodic leaderboard update failed:", error);
+                }
+            }, 60000);
+        } catch (error) {
+            console.error("Leaderboard initialization failed:", error);
+            if (gamblersContainer) gamblersContainer.innerHTML = `<p style="color: #d9534f; font-weight: bold;">Error: ${error.message}</p>`;
+            if (leaderboardBody) leaderboardBody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 20px;"><strong>Error:</strong> ${error.message}</td></tr>`;
+        }
     }
 };
 
-// --- 4. AUCTION-SPECIFIC FUNCTIONS ---
+// --- 4. AUCTION MODULE ---
 const auction = {
-    async initialize() {
+    async init() {
         if (isAuctionInitialized) return;
         isAuctionInitialized = true;
         
@@ -115,21 +128,6 @@ const auction = {
         if (!form) return;
 
         const appId = 'dgg-auction-final';
-        const activeView = document.getElementById('auction-active-view');
-        const finishedView = document.getElementById('auction-finished-view');
-        const notStartedView = document.getElementById('auction-not-started-view');
-        const gamblerSelect = document.getElementById('auction-gambler-select');
-        const playerSelect = document.getElementById('auction-player-select');
-        const bidAmountInput = document.getElementById('auction-bid-amount');
-        const errorMessageDiv = document.getElementById('auction-error-message');
-        const submitButton = document.getElementById('auction-submit-button');
-        const auctionResultsContainer = document.getElementById('auction-results-container');
-        const statusIndicator = document.getElementById('auction-status-indicator');
-        const auctionPageLayout = document.getElementById('auction-page-layout');
-        const auctionFormContainer = document.getElementById('auction-form-container');
-        const auctionStatusContainer = document.getElementById('auction-status-container');
-        const auctionStatusWrapper = auctionStatusContainer ? auctionStatusContainer.parentElement : null;
-
         const auctionBidsRef = collection(db, `/artifacts/${appId}/public/data/auctionBids`);
         const auctionStateRef = doc(db, `/artifacts/${appId}/public/data/auctionState/currentState`);
 
@@ -206,7 +204,7 @@ const auction = {
                 card.innerHTML = `<div class="player-name">${playerData.playerName}</div><div class="bid-info">Highest Bid (Tied):</div><div class="highest-bid">£${highestBidAmount.toFixed(0)}</div><div class="winner-name" style="color: var(--status-orange);">Tied Bidders: ${tiedGamblers}</div><div class="team-status" style="color: var(--danger-color); margin-top: 10px; border-top: none; font-weight: 700;">REMOVED FROM AUCTION</div>`;
             } else {
                 const winningBid = topBids[0];
-                card.innerHTML = `<div class="player-name">${playerData.playerName}</div><div class="bid-info">Winning Bid:</div><div class="highest-bid">£${winningBid.amount.toFixed(0)}</div><div class="winner-name">Won by: ${winningBid.gambler}</div>`;
+                card.innerHTML = `<div class="player-name">${playerData.playerName}</div><div class="bid-info">Winning Bid:</div><div class.name="highest-bid">£${winningBid.amount.toFixed(0)}</div><div class="winner-name">Won by: ${winningBid.gambler}</div>`;
             }
             auctionResultsContainer.appendChild(card);
         });
@@ -325,8 +323,8 @@ const auction = {
     }
 };
 
-// --- 5. MAIN APPLICATION ENTRY POINT ---
-document.addEventListener('DOMContentLoaded', async () => {
+// --- 5. MAIN APPLICATION INITIALIZATION ---
+async function main() {
     // Step 1: Initialize Firebase
     try {
         const firebaseConfig = {
@@ -348,7 +346,26 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
-    // Step 2: Setup Navigation
+    // Step 2: Load core config files
+    try {
+        const [configResponse, picksResponse] = await Promise.all([
+            fetch('/config.json'),
+            fetch('/picks.json')
+        ]);
+        if (!configResponse.ok || !picksResponse.ok) {
+            throw new Error('Failed to load initial config or picks files.');
+        }
+        const configData = await configResponse.json();
+        gamblerPicks = await picksResponse.json();
+        availableGamblers = configData.gamblers;
+        tournamentConfig = configData.tournament;
+    } catch (error) {
+        console.error("Failed to load configuration:", error);
+        document.body.innerHTML = `<p style="color: red; text-align: center; padding-top: 50px;">Critical Error: Could not load configuration files. The application cannot start.</p>`;
+        return;
+    }
+
+    // Step 3: Setup Navigation
     if (navContainer) {
         navContainer.addEventListener('click', (e) => {
             const button = e.target.closest('.nav-button');
@@ -359,43 +376,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                 button.classList.add('active');
                 
                 if (targetPageId === 'gamblers') {
-                    auction.initialize();
+                    auction.init();
                 }
             }
         });
     }
 
-    // Step 3: Load core data and setup Leaderboard
-    try {
-        const [configResponse, picksResponse] = await Promise.all([
-            fetch('/config.json'),
-            fetch('/picks.json')
-        ]);
-        if (!configResponse.ok || !picksResponse.ok) {
-            throw new Error('Failed to load initial config or picks files.');
-        }
-        
-        const configData = await configResponse.json();
-        gamblerPicks = await picksResponse.json();
-        availableGamblers = configData.gamblers; // CRITICAL: This now loads before anything else needs it.
-        tournamentConfig = configData.tournament;
-        
-        allPlayersData = await leaderboard.fetchPlayerData(configData);
-        leaderboard.updateUI();
-        
-        // Setup leaderboard refresh
-        setInterval(async () => {
-            try {
-                allPlayersData = await leaderboard.fetchPlayerData(configData);
-                leaderboard.updateUI();
-            } catch (error) {
-                console.error("Periodic leaderboard update failed:", error);
-            }
-        }, 60000);
+    // Step 4: Initialize the default view (Leaderboard)
+    leaderboard.init();
+}
 
-    } catch (error) {
-        console.error("Main Initialization failed:", error);
-        if (gamblersContainer) gamblersContainer.innerHTML = `<p style="color: #d9534f; font-weight: bold;">Error: ${error.message}</p>`;
-        if (leaderboardBody) leaderboardBody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 20px;"><strong>Error:</strong> ${error.message}</td></tr>`;
-    }
-});
+// --- Run the application ---
+main();
