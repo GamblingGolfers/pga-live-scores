@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- This corrected CSP allows scripts from gstatic.com and connections to firebase -->
     <meta http-equiv="Content-Security-Policy" content="script-src 'self' https://www.gstatic.com; connect-src 'self' https://live-golf-data.p.rapidapi.com wss://*.firebaseio.com;">
     <title>Discriminatory Gamblers - Golf Suite</title>
     
@@ -145,8 +144,7 @@
         </div>
     </div>
     
-    <!-- The single, unified script -->
-    <script src="app.js" type="module"></script>
-    
+    <script src="app.js"></script>
+    <script src="gamblers.js" type="module"></script>
 </body>
 </html>
