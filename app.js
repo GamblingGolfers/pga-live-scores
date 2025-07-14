@@ -2,12 +2,11 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, collection, doc, onSnapshot, getDoc, getDocs, setDoc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+// Import configuration directly, eliminating the failed 'fetch' calls
+import { tournamentInfo, gamblerNames, playerPicks } from './config.js';
 
 // --- 1. GLOBAL STATE & CONFIGURATION ---
 let db, auth; 
-let gamblerPicks = {};
-let availableGamblers = [];
-let tournamentConfig = {};
 let allPlayersData = [];
 let isAuctionInitialized = false;
 
@@ -33,7 +32,7 @@ const leaderboard = {
     updateUI() {
         if (!gamblersContainer || !leaderboardBody) return;
         const gamblerData = {};
-        availableGamblers.forEach(gambler => {
+        gamblerNames.forEach(gambler => {
             gamblerData[gambler] = { totalScore: 0, todayScore: 0, players: [], hasMissedCutPlayer: false, missedCutCount: 0, totalPicks: 0 };
         });
         allPlayersData.forEach(player => {
@@ -41,7 +40,7 @@ const leaderboard = {
             const isOutOfTournament = player.status === 'cut' || player.status === 'wd';
             const parsedPlayerScore = this.parseScore(player.total);
             const parsedTodayScore = this.parseScore(player.currentRoundScore);
-            const tagsForPlayer = gamblerPicks[player.playerId] || [];
+            const tagsForPlayer = playerPicks[player.playerId] || [];
             tagsForPlayer.forEach(gamblerName => {
                 const gambler = gamblerData[gamblerName];
                 if (gambler) {
@@ -79,7 +78,7 @@ const leaderboard = {
         
         leaderboardBody.innerHTML = allPlayersData.map(player => {
             if (!player || !player.playerId) return '';
-            const tagsHtml = (gamblerPicks[player.playerId] || []).map(tag => `<span class="tag">${tag}</span>`).join('');
+            const tagsHtml = (playerPicks[player.playerId] || []).map(tag => `<span class="tag">${tag}</span>`).join('');
             const totalScoreInfo = this.formatScore(this.parseScore(player.total));
             const todayScoreInfo = this.formatScore(this.parseScore(player.currentRoundScore));
             let lastRound = 'N/A';
@@ -91,7 +90,7 @@ const leaderboard = {
         }).join('');
     },
     async fetchPlayerData(config) {
-        const url = `/.netlify/functions/get-scores?orgId=${config.tournament.orgId}&tournId=${config.tournament.tournId}&year=${config.tournament.year}`;
+        const url = `/.netlify/functions/get-scores?orgId=${config.orgId}&tournId=${config.tournId}&year=${config.year}`;
         const response = await fetch(url);
         if (!response.ok) throw new Error(`Live API failed with status: ${response.status}`);
         const data = await response.json();
@@ -115,7 +114,7 @@ const auction = {
 
         try {
             const provisionalResponse = await fetch('provisional_players.json');
-            if (!provisionalResponse.ok) throw new Error("Could not load provisional_players.json");
+            if (!provisionalResponse.ok) throw new Error("Could not load auction player list.");
             const provisionalData = await provisionalResponse.json();
             
             const auctionPlayers = provisionalData.map((player, index) => ({
@@ -138,16 +137,9 @@ const auction = {
                     const auctionData = {};
                     bidsSnapshot.forEach(doc => { auctionData[doc.id] = doc.data(); });
                     this.setupPageByStatus(currentStatus, auctionData, auctionPlayers);
-                }, (error) => {
-                    console.error("Error listening to auction bids:", error);
-                    this.setPageError("Error loading auction data.");
-                });
-            }, (error) => {
-                console.error("Error listening to auction state:", error);
-                this.setPageError("Could not determine auction status.");
-            });
+                }, (error) => this.setPageError("Error loading auction data."));
+            }, (error) => this.setPageError("Could not determine auction status."));
         } catch (error) {
-            console.error("Auction Initialization failed:", error);
             this.setPageError(`Auction Initialization failed: ${error.message}`);
         }
     },
@@ -291,7 +283,7 @@ const auction = {
             const playerSelect = document.getElementById('auction-player-select');
             const submitButton = document.getElementById('auction-submit-button');
             
-            this.populateDropdown(gamblerSelect, availableGamblers, 'Select Your Name');
+            this.populateDropdown(gamblerSelect, gamblerNames, 'Select Your Name');
             this.populateDropdown(playerSelect, localPlayers, 'Select a Player', true);
             submitButton.disabled = false;
             
@@ -328,27 +320,7 @@ async function main() {
         return;
     }
 
-    // Step 2: Load core config files
-    try {
-        // Use relative paths for reliability
-        const [configResponse, picksResponse] = await Promise.all([
-            fetch('config.json'),
-            fetch('picks.json')
-        ]);
-        if (!configResponse.ok || !picksResponse.ok) {
-            throw new Error(`Failed to load initial config files. Status: ${configResponse.status}, ${picksResponse.status}`);
-        }
-        const configData = await configResponse.json();
-        gamblerPicks = await picksResponse.json();
-        availableGamblers = configData.gamblers;
-        tournamentConfig = configData.tournament;
-    } catch (error) {
-        console.error("Failed to load configuration:", error);
-        document.body.innerHTML = `<p style="color: red; text-align: center; padding-top: 50px;">Critical Error: Could not load configuration files. The application cannot start.</p>`;
-        return;
-    }
-
-    // Step 3: Setup Navigation
+    // Step 2: Setup Navigation
     if (navContainer) {
         navContainer.addEventListener('click', (e) => {
             const button = e.target.closest('.nav-button');
@@ -365,13 +337,14 @@ async function main() {
         });
     }
 
-    // Step 4: Initialize the default view (Leaderboard)
+    // Step 3: Initialize the default view (Leaderboard)
     try {
-        allPlayersData = await leaderboard.fetchPlayerData(tournamentConfig);
+        allPlayersData = await leaderboard.fetchPlayerData(tournamentInfo);
         leaderboard.updateUI();
+        // Setup leaderboard refresh
         setInterval(async () => {
             try {
-                allPlayersData = await leaderboard.fetchPlayerData(tournamentConfig);
+                allPlayersData = await leaderboard.fetchPlayerData(tournamentInfo);
                 leaderboard.updateUI();
             } catch (error) {
                 console.error("Periodic leaderboard update failed:", error);
