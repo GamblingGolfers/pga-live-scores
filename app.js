@@ -3,7 +3,7 @@
 // Import Firebase modules first
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, collection, doc, onSnapshot, getDocs, setDoc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getFirestore, collection, doc, onSnapshot, getDoc, getDocs, setDoc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 document.addEventListener('DOMContentLoaded', () => {
     
@@ -46,7 +46,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!form) return;
 
         // --- Firebase Configuration ---
-        // It's recommended to manage API keys and config via environment variables or a secure backend service in production.
         const firebaseConfig = {
           apiKey: "AIzaSyCxORo_xPNGACIRk5JryuXvxU4wSzwtdvE",
           authDomain: "gambling-golfers.firebaseapp.com",
@@ -82,7 +81,8 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // --- Firestore References ---
         const auctionBidsRef = collection(db, `/artifacts/${appId}/public/data/auctionBids`);
-        const auctionStateRef = doc(db, `/artifacts/${appId}/public/data/auctionState`); // New reference for auction status
+        // CORRECTED PATH: Points to a specific document 'currentState' inside the 'auctionState' collection.
+        const auctionStateRef = doc(db, `/artifacts/${appId}/public/data/auctionState/currentState`); 
 
         const setPageError = (message) => {
             const pageDiv = document.getElementById('page-gamblers');
@@ -154,9 +154,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 submitButton.textContent = 'Placing Bid...';
                 const playerDocRef = doc(db, auctionBidsRef.path, selectedPlayerId);
                 const playerDocSnap = await getDoc(playerDocRef);
-                const playerData = playerDocSnap.exists() ? playerDocSnap.data() : null;
                 const newBid = { amount: bidAmount, gambler: selectedGambler, timestamp: Date.now() };
-                if (playerData) {
+                if (playerDocSnap.exists()) {
                     await updateDoc(playerDocRef, { bids: arrayUnion(newBid) });
                 } else {
                     const playerInfo = localPlayers.find(p => p.id === selectedPlayerId);
@@ -210,7 +209,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 populateDropdown(gamblerSelect, availableGamblers, 'Select Your Name');
                 populateDropdown(playerSelect, localPlayers, 'Select a Player', true);
                 submitButton.disabled = false;
-                // Use a flag to ensure the event listener is only added once
                 if (!form.dataset.listenerAttached) {
                     form.addEventListener('submit', (e) => handleFormSubmit(e, localPlayers));
                     form.dataset.listenerAttached = 'true';
@@ -238,20 +236,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
                 
-                // --- REAL-TIME STATUS AND DATA HANDLING ---
                 let currentStatus = 'not_started';
                 let bidsUnsubscribe = null;
 
-                // Listen for status changes
                 onSnapshot(auctionStateRef, (stateDoc) => {
                     currentStatus = stateDoc.exists() ? stateDoc.data().status : 'not_started';
 
-                    // If a bids listener already exists, unsubscribe to avoid duplicates
                     if (bidsUnsubscribe) {
                         bidsUnsubscribe();
                     }
 
-                    // Listen for bid changes, and re-render the page with the current status
                     bidsUnsubscribe = onSnapshot(auctionBidsRef, (bidsSnapshot) => {
                         const auctionData = {};
                         bidsSnapshot.forEach(doc => { auctionData[doc.id] = doc.data(); });
@@ -287,6 +281,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         const updateUI = () => {
+            if (!gamblersContainer || !leaderboardBody) return;
             const gamblerData = {};
             availableGamblers.forEach(gambler => {
                 gamblerData[gambler] = { totalScore: 0, todayScore: 0, players: [], hasMissedCutPlayer: false, missedCutCount: 0, totalPicks: 0 };
@@ -318,34 +313,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!gamblerA.hasMissedCutPlayer && gamblerB.hasMissedCutPlayer) return -1;
                 return gamblerA.totalScore - gamblerB.totalScore;
             });
-            if (gamblersContainer) {
-                gamblersContainer.innerHTML = '';
-                sortedGamblers.forEach(([gamblerName, gamblerInfo]) => {
-                    const card = document.createElement('div');
-                    card.className = 'gambler-card';
-                    let finalScore = gamblerInfo.hasMissedCutPlayer ? { text: formatScore(gamblerInfo.totalScore).text, className: 'score-over' } : formatScore(gamblerInfo.totalScore);
-                    const todayScoreInfo = formatScore(gamblerInfo.todayScore);
-                    const madeCutCount = gamblerInfo.totalPicks - gamblerInfo.missedCutCount;
-                    const teamStatusText = `${madeCutCount}/${gamblerInfo.totalPicks} MADE CUT`;
-                    const playerBreakdownHtml = gamblerInfo.players.map(p => `<div class="player-row ${p.hasMissedCut ? 'missed-cut' : ''}"><span class="player-name">${p.name}</span><span class="player-score ${formatScore(p.score).className}">${formatScore(p.score).text}${p.hasMissedCut ? ' (MC)' : ''}</span></div>`).join('');
-                    card.innerHTML = `<div class="name">${gamblerName}</div><div class="total-score ${finalScore.className}">${finalScore.text}</div><div class="today-score ${todayScoreInfo.className}">Today: ${todayScoreInfo.text}</div><div class="team-status">${teamStatusText}</div><div class="player-breakdown">${playerBreakdownHtml}</div>`;
-                    gamblersContainer.appendChild(card);
-                });
-            }
-            if (leaderboardBody) {
-                leaderboardBody.innerHTML = allPlayersData.map(player => {
-                    if (!player || !player.playerId) return '';
-                    const tagsHtml = (gamblerPicks[player.playerId] || []).map(tag => `<span class="tag">${tag}</span>`).join('');
-                    const totalScoreInfo = formatScore(parseScore(player.total));
-                    const todayScoreInfo = formatScore(parseScore(player.currentRoundScore));
-                    let lastRound = 'N/A';
-                    if (player.rounds && player.rounds.length > 0) {
-                        const lastRoundData = player.rounds[player.rounds.length - 1];
-                        if (lastRoundData && lastRoundData.strokes && lastRoundData.strokes['$numberInt']) lastRound = lastRoundData.strokes['$numberInt'];
-                    }
-                    return `<tr><td>${tagsHtml}</td><td>${player.position || 'N/A'}</td><td>${player.firstName || ''} ${player.lastName || ''}</td><td class="${totalScoreInfo.className}">${totalScoreInfo.text}</td><td class="${todayScoreInfo.className}">${todayScoreInfo.text}</td><td>${player.thru || 'N/A'}</td><td>${lastRound}</td></tr>`;
-                }).join('');
-            }
+            
+            gamblersContainer.innerHTML = '';
+            sortedGamblers.forEach(([gamblerName, gamblerInfo]) => {
+                const card = document.createElement('div');
+                card.className = 'gambler-card';
+                let finalScore = gamblerInfo.hasMissedCutPlayer ? { text: formatScore(gamblerInfo.totalScore).text, className: 'score-over' } : formatScore(gamblerInfo.totalScore);
+                const todayScoreInfo = formatScore(gamblerInfo.todayScore);
+                const madeCutCount = gamblerInfo.totalPicks - gamblerInfo.missedCutCount;
+                const teamStatusText = `${madeCutCount}/${gamblerInfo.totalPicks} MADE CUT`;
+                const playerBreakdownHtml = gamblerInfo.players.map(p => `<div class="player-row ${p.hasMissedCut ? 'missed-cut' : ''}"><span class="player-name">${p.name}</span><span class="player-score ${formatScore(p.score).className}">${formatScore(p.score).text}${p.hasMissedCut ? ' (MC)' : ''}</span></div>`).join('');
+                card.innerHTML = `<div class="name">${gamblerName}</div><div class="total-score ${finalScore.className}">${finalScore.text}</div><div class="today-score ${todayScoreInfo.className}">Today: ${todayScoreInfo.text}</div><div class="team-status">${teamStatusText}</div><div class="player-breakdown">${playerBreakdownHtml}</div>`;
+                gamblersContainer.appendChild(card);
+            });
+            
+            leaderboardBody.innerHTML = allPlayersData.map(player => {
+                if (!player || !player.playerId) return '';
+                const tagsHtml = (gamblerPicks[player.playerId] || []).map(tag => `<span class="tag">${tag}</span>`).join('');
+                const totalScoreInfo = formatScore(parseScore(player.total));
+                const todayScoreInfo = formatScore(parseScore(player.currentRoundScore));
+                let lastRound = 'N/A';
+                if (player.rounds && player.rounds.length > 0) {
+                    const lastRoundData = player.rounds[player.rounds.length - 1];
+                    if (lastRoundData && lastRoundData.strokes && lastRoundData.strokes['$numberInt']) lastRound = lastRoundData.strokes['$numberInt'];
+                }
+                return `<tr><td>${tagsHtml}</td><td>${player.position || 'N/A'}</td><td>${player.firstName || ''} ${player.lastName || ''}</td><td class="${totalScoreInfo.className}">${totalScoreInfo.text}</td><td class="${todayScoreInfo.className}">${todayScoreInfo.text}</td><td>${player.thru || 'N/A'}</td><td>${lastRound}</td></tr>`;
+            }).join('');
         };
 
         const fetchPlayerData = async (config) => {
@@ -386,7 +379,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (error) {
                 console.error("Initialization failed:", error);
                 if (gamblersContainer) gamblersContainer.innerHTML = `<p style="color: #d9534f; font-weight: bold;">Error: ${error.message}</p>`;
-                if (leaderboardBody) leaderboardBody.innerHTML = `<tr><td colspan="7"><strong>Error:</strong> ${error.message}</td></tr>`;
+                if (leaderboardBody) leaderboardBody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 20px;"><strong>Error:</strong> ${error.message}</td></tr>`;
             }
         })();
     })();
