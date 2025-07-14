@@ -3,7 +3,7 @@
 // Import Firebase modules first
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, collection, doc, getDoc, setDoc, updateDoc, arrayUnion, onSnapshot, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getFirestore, collection, doc, onSnapshot, getDocs, setDoc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 document.addEventListener('DOMContentLoaded', () => {
     
@@ -19,7 +19,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const pages = document.querySelectorAll('.page');
     const leaderboardBody = document.getElementById('leaderboard-body');
     const gamblersContainer = document.getElementById('gamblers-container');
-    const auctionNavButton = document.querySelector('.nav-button[data-page="gamblers"]');
 
     // --- NAVIGATION ---
     if (navContainer) {
@@ -46,6 +45,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const form = document.getElementById('auction-form');
         if (!form) return;
 
+        // --- Firebase Configuration ---
+        // It's recommended to manage API keys and config via environment variables or a secure backend service in production.
         const firebaseConfig = {
           apiKey: "AIzaSyCxORo_xPNGACIRk5JryuXvxU4wSzwtdvE",
           authDomain: "gambling-golfers.firebaseapp.com",
@@ -57,6 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         const appId = 'dgg-auction-final';
 
+        // --- Auction DOM Elements ---
         const activeView = document.getElementById('auction-active-view');
         const finishedView = document.getElementById('auction-finished-view');
         const notStartedView = document.getElementById('auction-not-started-view');
@@ -65,18 +67,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const bidAmountInput = document.getElementById('auction-bid-amount');
         const errorMessageDiv = document.getElementById('auction-error-message');
         const submitButton = document.getElementById('auction-submit-button');
-        const auctionStatusContainer = document.getElementById('auction-status-container');
         const auctionResultsContainer = document.getElementById('auction-results-container');
         const statusIndicator = document.getElementById('auction-status-indicator');
         const auctionPageLayout = document.getElementById('auction-page-layout');
         const auctionFormContainer = document.getElementById('auction-form-container');
-        const auctionStatusWrapper = auctionStatusContainer.parentElement;
+        const auctionStatusContainer = document.getElementById('auction-status-container');
+        const auctionStatusWrapper = auctionStatusContainer ? auctionStatusContainer.parentElement : null;
 
+
+        // --- Firebase Initialization ---
         const firebaseApp = initializeApp(firebaseConfig);
         const firebaseAuth = getAuth(firebaseApp);
         const db = getFirestore(firebaseApp);
+        
+        // --- Firestore References ---
         const auctionBidsRef = collection(db, `/artifacts/${appId}/public/data/auctionBids`);
-        const auctionArchivesRef = collection(db, `/artifacts/${appId}/public/data/auctionArchives`);
+        const auctionStateRef = doc(db, `/artifacts/${appId}/public/data/auctionState`); // New reference for auction status
 
         const setPageError = (message) => {
             const pageDiv = document.getElementById('page-gamblers');
@@ -94,9 +100,9 @@ document.addEventListener('DOMContentLoaded', () => {
             select.disabled = false;
         };
         
-        const renderFinishedResults = (auctionData, localPlayers) => {
-            const playersWithBids = Object.keys(auctionData);
+        const renderFinishedResults = (auctionData) => {
             auctionResultsContainer.innerHTML = '';
+            const playersWithBids = Object.keys(auctionData);
             if (playersWithBids.length === 0) {
                 auctionResultsContainer.innerHTML = `<p style="color: var(--text-muted-color);">The auction finished with no bids placed.</p>`;
                 return;
@@ -174,6 +180,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 auctionFormContainer.style.margin = '';
             }
             if(auctionStatusWrapper) auctionStatusWrapper.style.display = '';
+            
             if (statusIndicator) {
                  switch (status) {
                     case 'active': 
@@ -203,9 +210,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 populateDropdown(gamblerSelect, availableGamblers, 'Select Your Name');
                 populateDropdown(playerSelect, localPlayers, 'Select a Player', true);
                 submitButton.disabled = false;
-                form.addEventListener('submit', (e) => handleFormSubmit(e, localPlayers));
+                // Use a flag to ensure the event listener is only added once
+                if (!form.dataset.listenerAttached) {
+                    form.addEventListener('submit', (e) => handleFormSubmit(e, localPlayers));
+                    form.dataset.listenerAttached = 'true';
+                }
             } else if (status === 'finished') {
-                renderFinishedResults(auctionData, localPlayers);
+                renderFinishedResults(auctionData);
             }
         };
 
@@ -213,7 +224,6 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 await signInAnonymously(firebaseAuth);
                 
-                // --- NEW: Fetch provisional data directly for the auction ---
                 const provisionalResponse = await fetch('/provisional_players.json');
                 if (!provisionalResponse.ok) throw new Error("Could not load provisional_players.json");
                 const provisionalData = await provisionalResponse.json();
@@ -222,21 +232,37 @@ document.addEventListener('DOMContentLoaded', () => {
                     id: `${player.lastName.toLowerCase()}_${player.firstName.toLowerCase()}_${index}`.replace(/\s/g, ''),
                     name: `${player.firstName} ${player.lastName}`
                 })).sort((a,b) => a.name.localeCompare(b.name));
-                // --- END NEW ---
 
                 if (auctionPlayers.length === 0) {
                     setPageError('Provisional player list is empty.');
                     return;
                 }
                 
-                const configResponse = await fetch('/config.json');
-                const configData = await configResponse.json();
-                const currentStatus = configData.auctionStatus || 'not_started';
-                
-                onSnapshot(auctionBidsRef, (snapshot) => {
-                    const auctionData = {};
-                    snapshot.forEach(doc => { auctionData[doc.id] = doc.data(); });
-                    setupPageByStatus(currentStatus, auctionData, auctionPlayers);
+                // --- REAL-TIME STATUS AND DATA HANDLING ---
+                let currentStatus = 'not_started';
+                let bidsUnsubscribe = null;
+
+                // Listen for status changes
+                onSnapshot(auctionStateRef, (stateDoc) => {
+                    currentStatus = stateDoc.exists() ? stateDoc.data().status : 'not_started';
+
+                    // If a bids listener already exists, unsubscribe to avoid duplicates
+                    if (bidsUnsubscribe) {
+                        bidsUnsubscribe();
+                    }
+
+                    // Listen for bid changes, and re-render the page with the current status
+                    bidsUnsubscribe = onSnapshot(auctionBidsRef, (bidsSnapshot) => {
+                        const auctionData = {};
+                        bidsSnapshot.forEach(doc => { auctionData[doc.id] = doc.data(); });
+                        setupPageByStatus(currentStatus, auctionData, auctionPlayers);
+                    }, (error) => {
+                        console.error("Error listening to auction bids:", error);
+                        setPageError("Error loading auction data.");
+                    });
+                }, (error) => {
+                    console.error("Error listening to auction state:", error);
+                    setPageError("Could not determine auction status.");
                 });
 
             } catch (error) {
@@ -323,12 +349,10 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         const fetchPlayerData = async (config) => {
-            // This is the original API fetch logic, it remains unchanged
             console.log("Fetching live player data from API for Leaderboard.");
             const url = `/.netlify/functions/get-scores?orgId=${config.tournament.orgId}&tournId=${config.tournament.tournId}&year=${config.tournament.year}`;
             const response = await fetch(url);
             if (!response.ok) {
-                // If API fails, we don't use a fallback for the leaderboard page to avoid confusion
                 throw new Error(`Live API failed with status: ${response.status}`);
             }
             const data = await response.json();
@@ -351,8 +375,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateUI();
                 
                 setInterval(async () => {
-                    allPlayersData = await fetchPlayerData(configData);
-                    updateUI();
+                    try {
+                        allPlayersData = await fetchPlayerData(configData);
+                        updateUI();
+                    } catch (error) {
+                        console.error("Periodic leaderboard update failed:", error);
+                    }
                 }, 60000);
 
             } catch (error) {
