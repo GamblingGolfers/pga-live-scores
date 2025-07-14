@@ -200,25 +200,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             if (status === 'active') {
-                // --- NEW SORTING LOGIC ---
-                // Create a copy of the player data and sort it by last name, then first name.
-                const sortedPlayers = [...allPlayersData].sort((a, b) => {
-                    const lastNameA = a.lastName || '';
-                    const lastNameB = b.lastName || '';
-                    if (lastNameA.localeCompare(lastNameB) !== 0) {
-                        return lastNameA.localeCompare(lastNameB);
-                    }
-                    const firstNameA = a.firstName || '';
-                    const firstNameB = b.firstName || '';
-                    return firstNameA.localeCompare(firstNameB);
-                });
-
-                // Map the newly sorted array to the format needed for the dropdown.
-                const playersForDropdown = sortedPlayers.map(p => ({ 
-                    id: p.playerId, 
-                    name: `${p.firstName} ${p.lastName}` 
-                }));
-                // --- END NEW SORTING LOGIC ---
+                // --- THIS IS THE REVERTED, WORKING SORT LOGIC ---
+                const playersForDropdown = allPlayersData.map(p => ({ id: p.playerId, name: `${p.firstName} ${p.lastName}` })).sort((a,b) => a.name.localeCompare(b.name));
+                // --- END REVERTED LOGIC ---
 
                 populateDropdown(gamblerSelect, availableGamblers, 'Select Your Name');
                 populateDropdown(playerSelect, playersForDropdown, 'Select a Player', true);
@@ -258,7 +242,7 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 await signInAnonymously(firebaseAuth);
                 if (allPlayersData.length === 0) {
-                    setPageError('Player data is not yet available.');
+                    setPageError('Player data is not yet available. Please refresh the page.');
                     return;
                 }
                 const configResponse = await fetch('/config.json');
