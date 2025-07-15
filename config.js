@@ -3,7 +3,7 @@
 
 export const tournamentInfo = {
   orgId: "1",
-  tournId: "026",
+  tournId: "541",
   year: "2025"
 };
 
@@ -17,16 +17,16 @@ export const gamblerNames = [
 ];
 
 export const playerPicks = {
-  "37378": ["Kris", "Cal"],
-  "31323": ["Phil"],
-  "58619": ["Kris"],
-  "46046": ["Dean"],
-  "52666": ["Phil"],
-  "51766": ["Cal"],
-  "40250": ["Billy"],
-  "28237": ["Dean"],
-  "38991": ["Billy"],
-  "59018": ["Cal"],
-  "35506": ["Pet"],
-  "54628": ["Pet"]
+  "52955": ["Kris"],
+  "48081": ["Phil"],
+  "46717": ["Kris"],
+  "34098": ["Dean"],
+  "34363": ["Phil"],
+  "46046": ["Cal"],
+  "52215": ["Billy"],
+  "30911": ["Dean"],
+  "40098": ["Billy"],
+  "28237": ["Cal"],
+  "50525": ["Pet"],
+  "46970": ["Pet"]
 };
