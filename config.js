@@ -3,7 +3,7 @@
 
 export const tournamentInfo = {
   orgId: "1",
-  tournId: "541",
+  tournId: "100",
   year: "2025"
 };
 
