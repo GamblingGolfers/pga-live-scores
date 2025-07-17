@@ -82,31 +82,36 @@ const leaderboard = {
             const totalScoreInfo = this.formatScore(this.parseScore(player.total));
             const todayScoreInfo = this.formatScore(this.parseScore(player.currentRoundScore));
             
-            // --- FIX FOR 'THRU' ---
-            // Use player.currentHole directly, or 'F' if roundComplete
+            // --- FIX FOR 'THRU' (now correctly handles object structure if present) ---
             let thruValue;
             if (player.roundComplete) {
                 thruValue = 'F'; // 'F' for Finished Round
             } else {
-                thruValue = player.currentHole || 'N/A'; // Use currentHole if available
+                // If player.currentHole is an object like { '$numberInt': '13' }
+                if (typeof player.currentHole === 'object' && player.currentHole['$numberInt']) {
+                    thruValue = player.currentHole['$numberInt'];
+                } else {
+                    thruValue = player.currentHole || 'N/A'; // Use currentHole if it's a direct value
+                }
             }
             
             // --- FIX FOR 'LAST ROUND' (ROUND SCORE) ---
             let roundScoreDisplay = 'N/A';
             if (player.rounds && player.rounds.length > 0) {
-                // If rounds array *does* contain data, get the last completed round's strokes
                 const lastCompletedRound = player.rounds[player.rounds.length - 1];
                 if (lastCompletedRound && lastCompletedRound.strokes) {
-                    roundScoreDisplay = lastCompletedRound.strokes;
+                    // Assuming strokes might also be an object { '$numberInt': 'X' }
+                    if (typeof lastCompletedRound.strokes === 'object' && lastCompletedRound.strokes['$numberInt']) {
+                        roundScoreDisplay = lastCompletedRound.strokes['$numberInt'];
+                    } else {
+                        roundScoreDisplay = lastCompletedRound.strokes;
+                    }
                 }
             } else if (player.currentRoundScore) {
-                // If no completed rounds, but there's a current round score, use that.
-                // This covers players in progress.
                 roundScoreDisplay = todayScoreInfo.text; // Use the formatted today's score
             }
 
-
-            return `<tr><td>${tagsHtml}</td><td>${player.position || 'N/A'}</td><td>${player.firstName || ''} ${player.lastName || ''}</td><td class="${totalScoreInfo.className}">${totalScoreInfo.className}">${totalScoreInfo.text}</td><td class="${todayScoreInfo.className}">${todayScoreInfo.text}</td><td>${thruValue}</td><td>${roundScoreDisplay}</td></tr>`;
+            return `<tr><td>${tagsHtml}</td><td>${player.position || 'N/A'}</td><td>${player.firstName || ''} ${player.lastName || ''}</td><td class="${totalScoreInfo.className}">${totalScoreInfo.text}</td><td class="${todayScoreInfo.className}">${todayScoreInfo.text}</td><td>${thruValue}</td><td>${roundScoreDisplay}</td></tr>`;
         }).join('');
     },
     async fetchPlayerData(config) {
