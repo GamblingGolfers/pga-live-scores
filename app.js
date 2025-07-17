@@ -81,12 +81,27 @@ const leaderboard = {
             const tagsHtml = (playerPicks[player.playerId] || []).map(tag => `<span class="tag">${tag}</span>`).join('');
             const totalScoreInfo = this.formatScore(this.parseScore(player.total));
             const todayScoreInfo = this.formatScore(this.parseScore(player.currentRoundScore));
-            let lastRound = 'N/A';
+            
+            // --- FIX FOR 'THRU' ---
+            // Check if player.thru exists, otherwise try player.currentRound.thru or similar
+            const thruValue = player.thru || (player.currentRound ? player.currentRound.thru : 'N/A');
+            
+            // --- FIX FOR 'LAST ROUND' (ROUND SCORE) ---
+            let lastRoundScore = 'N/A';
             if (player.rounds && player.rounds.length > 0) {
                 const lastRoundData = player.rounds[player.rounds.length - 1];
-                if (lastRoundData && lastRoundData.strokes && lastRoundData.strokes['$numberInt']) lastRound = lastRoundData.strokes['$numberInt'];
+                // Assuming 'strokes' is directly the numerical value, or parse it if it's a string.
+                // If it's still an object like { '$numberInt': 'X' }, then the Netlify function
+                // should probably be parsing it into a simple number.
+                if (lastRoundData && lastRoundData.strokes) {
+                    // If strokes is a direct number or string like "70"
+                    lastRoundScore = lastRoundData.strokes; 
+                    // If strokes is consistently { '$numberInt': 'X' } and you can't change the API:
+                    // lastRoundScore = lastRoundData.strokes['$numberInt'] ? lastRoundData.strokes['$numberInt'] : 'N/A';
+                }
             }
-            return `<tr><td>${tagsHtml}</td><td>${player.position || 'N/A'}</td><td>${player.firstName || ''} ${player.lastName || ''}</td><td class="${totalScoreInfo.className}">${totalScoreInfo.text}</td><td class="${todayScoreInfo.className}">${todayScoreInfo.text}</td><td>${player.thru || 'N/A'}</td><td>${lastRound}</td></tr>`;
+
+            return `<tr><td>${tagsHtml}</td><td>${player.position || 'N/A'}</td><td>${player.firstName || ''} ${player.lastName || ''}</td><td class="${totalScoreInfo.className}">${totalScoreInfo.text}</td><td class="${todayScoreInfo.className}">${todayScoreInfo.text}</td><td>${thruValue}</td><td>${lastRoundScore}</td></tr>`;
         }).join('');
     },
     async fetchPlayerData(config) {
